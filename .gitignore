@@ -1,0 +1,35 @@
+# Local implementation plan
+/plan.md
+
+# Local secrets and environment overrides
+.env
+.env.*
+!.env.example
+
+# .NET
+**/bin/
+**/obj/
+**/TestResults/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+.vs/
+
+# Node / Vite
+**/node_modules/
+**/dist/
+**/.vite/
+**/coverage/
+*.tsbuildinfo
+
+# Editors and operating systems
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+/.codex-run/
+
+# Local routing-engine data is large and machine-specific
+/backend/infra/routing/data/*
+!/backend/infra/routing/data/README.md
