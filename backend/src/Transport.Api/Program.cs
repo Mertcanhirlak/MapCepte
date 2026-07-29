@@ -1,5 +1,8 @@
+using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Transport.Api.Authorization;
 using Transport.Api.Contracts;
 using Transport.Api.Health;
 using Transport.Api.Identity;
@@ -9,6 +12,55 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddOpenApi();
 builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services
+    .AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+    .AddCookie(options =>
+    {
+        options.Cookie.Name = "MapCepte.Auth";
+        options.Cookie.HttpOnly = true;
+        options.Cookie.SameSite = SameSiteMode.Lax;
+        options.Cookie.SecurePolicy = builder.Environment.IsDevelopment()
+            ? CookieSecurePolicy.SameAsRequest
+            : CookieSecurePolicy.Always;
+        options.ExpireTimeSpan = TimeSpan.FromMinutes(15);
+        options.SlidingExpiration = true;
+        options.Events.OnRedirectToLogin = context =>
+        {
+            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            return Task.CompletedTask;
+        };
+        options.Events.OnRedirectToAccessDenied = context =>
+        {
+            context.Response.StatusCode = StatusCodes.Status403Forbidden;
+            return Task.CompletedTask;
+        };
+    });
+builder.Services.AddPermissionAuthorization();
+builder.Services.AddAntiforgery(options =>
+{
+    options.HeaderName = "X-CSRF-TOKEN";
+    options.Cookie.Name = "MapCepte.Antiforgery";
+    options.Cookie.HttpOnly = true;
+    options.Cookie.SameSite = SameSiteMode.Lax;
+    options.Cookie.SecurePolicy = builder.Environment.IsDevelopment()
+        ? CookieSecurePolicy.SameAsRequest
+        : CookieSecurePolicy.Always;
+});
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddPolicy(
+        "auth-login",
+        context => RateLimitPartition.GetFixedWindowLimiter(
+            context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                AutoReplenishment = true,
+                PermitLimit = 5,
+                QueueLimit = 0,
+                Window = TimeSpan.FromMinutes(1),
+            }));
+});
 builder.Services
     .Configure<BootstrapAdminOptions>(
         builder.Configuration.GetSection(BootstrapAdminOptions.SectionName));
@@ -30,6 +82,7 @@ builder.Services.AddCors(options =>
         "Frontend",
         policy => policy
             .WithOrigins(frontendOrigins)
+            .AllowCredentials()
             .AllowAnyHeader()
             .AllowAnyMethod());
 });
@@ -45,7 +98,15 @@ else
     app.UseHttpsRedirection();
 }
 
+app.UseRouting();
 app.UseCors("Frontend");
+app.UseRateLimiter();
+app.UseAuthentication();
+app.UseAuthorization();
+app.UseAntiforgery();
+
+app.MapAuthEndpoints();
+app.MapAdminEndpoints();
 
 app.MapGet(
         "/api/system",
@@ -53,7 +114,7 @@ app.MapGet(
             new SystemInfoResponse(
                 Name: "MapCepte Transport API",
                 Runtime: ".NET 10",
-                Phase: "Foundation")))
+                Phase: "IdentityAuthorization")))
     .WithName("GetSystemInfo")
     .WithTags("System");
 

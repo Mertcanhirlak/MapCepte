@@ -149,7 +149,79 @@ users ──< user_roles >── roles ──< role_permissions >── permissi
 - `AdminBootstrapHostedService`, yalnızca `BootstrapAdmin__Enabled=true` olduğunda çalışır. E-posta, görünen ad ve parola environment variable üzerinden gelir.
 - Bootstrap tamamlandıktan sonra ilgili environment variable'lar temizlenmeli ve özellik kapalı tutulmalıdır.
 - Çalışan kullanıcı API süreci durdurulmadan ayrı Release çıktısıyla derleme yapıldı; toplam test sayısı 19'a çıktı ve tamamı geçti.
+- Yerel veritabanındaki `admin@mapcepte.local` hesabı bootstrap ile yeniden oluşturuldu ve `Admin` rolü SQL sorgusuyla doğrulandı. Development ortamında `AllowWeakPasswordInDevelopment` açık olduğunda en az 6 karakter kabul edilir; production ortamında 12 karakter, büyük/küçük harf, rakam ve sembol şartı devam eder.
+- Yerel giriş parolası environment variable üzerinden yalnızca bootstrap sürecine verildi; kaynak koda yazılmadı. Geçici bootstrap betiği ve logları işlem sonunda silindi.
+
+### Login ve güvenli tarayıcı oturumu
+
+- Özel JWT/refresh token yerine ASP.NET Core'un şifreli authentication cookie'si seçildi. Cookie `HttpOnly` olduğu için React veya zararlı bir JavaScript kodu cookie değerini okuyamaz.
+- Cookie 15 dakika geçerlidir. Kullanıcı aktif oldukça sliding expiration mekanizması oturumu yeniler; bu nedenle ayrı `/refresh` endpoint'i yoktur.
+- `LoginService`, e-postayı normalize eder, kullanıcıyı rol/permission bilgileriyle getirir ve hash doğrulaması yapar. Olmayan kullanıcılar için sahte hash doğrulaması çalıştırılarak zamanlama farkı azaltılır.
+- Başarılı login sonucunda kullanıcı kimliği, roller ve permission'lar şifreli cookie ticket'ına claim olarak yazılır.
+- `GET /api/auth/me`, cookie'deki claim'lerden mevcut kullanıcı görünümünü üretir.
+- `POST /api/auth/logout`, authentication cookie'sini geçersiz kılar.
+- Cookie tarayıcı tarafından otomatik gönderildiği için yazma istekleri CSRF saldırısına açıktır. `/api/auth/csrf` çift token üretir; login ve logout doğru `X-CSRF-TOKEN` header'ı olmadan `400` döndürür.
+- Kimlik login sırasında değiştiğinden login sonrasında CSRF token yeniden alınmalıdır.
+- Login endpoint'i IP başına dakikada beş denemeyle sınırlandırılmıştır.
+- HTTP entegrasyon testi anonim `/me`, CSRF'siz login, başarılı login, cookie ile `/me`, CSRF yenileme ve logout zincirini doğrular.
+- Çözümdeki 8 proje uyarısız derlendi; üç test projesinde toplam 25 test geçti.
+
+### Permission policy ve sunucu tarafı yetkilendirme
+
+Kimlik doğrulama kullanıcının kim olduğunu, yetkilendirme ise hangi işlemleri yapabileceğini belirler:
+
+- Oturum cookie'si yoksa korumalı endpoint `401 Unauthorized` döndürür.
+- Kullanıcı giriş yapmış fakat gereken permission claim'ine sahip değilse `403 Forbidden` döndürür.
+- Gereken permission varsa endpoint çalışır ve `200 OK` dönebilir.
+
+Kodun çalışma zinciri şöyledir:
+
+```text
+Login
+  → rol ve permission'lar claim olarak cookie'ye yazılır
+  → endpoint RequirePermission(...) ile policy ister
+  → PermissionAuthorizationHandler claim'i denetler
+  → izin varsa kullanım senaryosu çalışır
+```
+
+- `PermissionAuthorizationExtensions`, permission kataloğundaki her değer için merkezi bir policy oluşturur.
+- `PermissionAuthorizationHandler`, kullanıcının istenen permission claim'ine sahip olup olmadığını kontrol eder.
+- `GET /api/admin/roles`, ilk gerçek korumalı endpoint'tir ve `roles.read` ister.
+- `RoleCatalogService`, rol ve permission listesini Application katmanından sunar; API doğrudan EF Core'a bağlanmaz.
+- Entegrasyon testleri anonim kullanıcı için `401`, Operator için `403`, yetkili Admin için `200` sonucunu doğrular.
+- Bu faz sonunda 8 backend projesi uyarısız derlendi; üç test projesindeki toplam 26 test geçti.
+
+### React auth state ve korumalı rotalar
+
+Frontend oturum zinciri şöyledir:
+
+```text
+Uygulama açılır
+  → AuthProvider `/api/auth/me` çağırır
+  ├─ 200: kullanıcı auth state'e yazılır, korumalı route açılır
+  └─ 401: kullanıcı `/login` sayfasına yönlendirilir
+
+Login formu
+  → CSRF token alır
+  → e-posta/parolayı login endpoint'ine gönderir
+  → authentication cookie tarayıcıya yazılır
+  → kimlik değiştiği için CSRF token yenilenir
+  → kullanıcı hedeflediği korumalı sayfaya döner
+```
+
+- `authApi.ts`, bütün isteklerde `credentials: "include"` kullanarak cookie'nin API'ye gönderilmesini sağlar.
+- `AuthProvider`, kullanıcı, yüklenme, hata ve işlem durumlarının tek merkezidir.
+- `ProtectedRoute`, oturum yokken uygulama içeriğinin ve ağır harita modülünün açılmasını engeller.
+- `PermissionRoute`, permission'a göre sayfa görünümünü sınırlar; backend policy kontrolünün yerine geçmez.
+- React Router, `/login`, `/` ve `/admin/roles` adreslerini birbirinden ayırır.
+- `roles.read` permission'ı menüde rol yönetimini gösterir ve salt okunur rol kataloğunu açar.
+- Backend CORS listesi hem `localhost:5173` hem `127.0.0.1:5173` geliştirme adreslerine cookie'li isteğe izin verir.
+- Tarayıcı açısından `localhost` ve `127.0.0.1` farklı sitelerdir. Frontend `127.0.0.1` üzerinden açılıp API `localhost` adresine çağrıldığında `SameSite=Lax` CSRF cookie'si login POST'una gönderilmez ve API `400` döndürür.
+- Development çözümü olarak `VITE_API_BASE_URL` boş bırakılır. Vite, `/api` ve `/health` yollarını backend'e proxy'ler; tarayıcı bütün auth çağrılarını frontend ile aynı origin üzerinden görür.
+- Gerçek tarayıcı doğrulamasında CSRF `200`, login `200` döndü; uygulama operasyon haritasına yönlendi ve `Admin` menüsü görüntülendi.
+- Frontend lint ve production build geçti; dört test dosyasındaki toplam 8 test başarılı oldu. Backend'in 27 testi de yeniden geçti.
+- React Router kurulurken npm iki yüksek önem seviyeli bağımlılık uyarısı bildirdi. Ayrıntılı audit güvenlik politikası nedeniyle çalıştırılamadığı için bu bulgu sonraki güvenlik kontrolüne açık risk olarak taşındı.
 
 ## Sonraki öğrenme konusu
 
-Login kullanım senaryosu, kısa ömürlü access token ve veritabanında yalnızca hash'i tutulan döndürülebilir refresh token modeli eklenecek. Sonrasında `/me`, logout ve permission policy'leri bağlanacak.
+Admin kullanıcı yönetimi, ilk bootstrap hesabından sonra yeni Operator/User hesaplarının güvenli biçimde oluşturulmasını ve rollerinin atanmasını sağlayacak. Backend önce `users.manage` permission'ını ve kullanıcının kendi yetkisini yükseltememesi gibi kuralları zorunlu tutacak; frontend yalnızca bu kullanım senaryolarını yöneten ekran olacak.

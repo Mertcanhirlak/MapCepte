@@ -76,6 +76,24 @@ public sealed class AdminBootstrapServiceTests
                     password)));
     }
 
+    [Fact]
+    public async Task AllowsSixCharacterPasswordWhenDevelopmentOverrideIsExplicit()
+    {
+        var repository = new FakeIdentityRepository();
+        var passwordService = new FakePasswordHashService();
+        var service = CreateService(repository, passwordService);
+
+        var result = await service.BootstrapAsync(
+            new BootstrapAdminCommand(
+                "admin@example.com",
+                "Initial Admin",
+                "123456",
+                AllowWeakPassword: true));
+
+        Assert.Equal(BootstrapAdminStatus.Created, result.Status);
+        Assert.Equal("HASH::123456", repository.AddedUser?.PasswordHash);
+    }
+
     private static AdminBootstrapService CreateService(
         IIdentityRepository repository,
         IPasswordHashService passwordService)
@@ -104,6 +122,10 @@ public sealed class AdminBootstrapServiceTests
             return passwordHash == $"HASH::{providedPassword}"
                 ? PasswordVerificationOutcome.Success
                 : PasswordVerificationOutcome.Failed;
+        }
+
+        public void PerformDummyVerification(string providedPassword)
+        {
         }
     }
 
@@ -138,6 +160,19 @@ public sealed class AdminBootstrapServiceTests
             CancellationToken cancellationToken)
         {
             return Task.FromResult<Role?>(AdminRole);
+        }
+
+        public Task<IReadOnlyCollection<RoleCatalogItem>> ListRolesAsync(
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult<IReadOnlyCollection<RoleCatalogItem>>([]);
+        }
+
+        public Task<UserAuthenticationData?> FindUserAuthenticationDataAsync(
+            string normalizedEmail,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult<UserAuthenticationData?>(null);
         }
 
         public Task AddUserAsync(

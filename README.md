@@ -40,4 +40,4 @@ Frontend varsayılan olarak `http://localhost:5173` adresinde çalışır.
 
 ## Faz durumu
 
-Faz 0 proje temeli ve Faz 1'in kimlik şeması, varsayılan yetki matrisi, güvenli parola hasher'ı ile Admin bootstrap altyapısı tamamlanmıştır. Sıradaki dikey dilim login ve access/refresh token akışıdır.
+Faz 0 proje temeli ile Faz 1'in backend/frontend oturum ve yetkilendirme temeli tamamlanmıştır. React login ekranı, cookie/CSRF akışı, korumalı rotalar, permission tabanlı menü ve salt okunur rol kataloğu hazırdır. Sıradaki dikey dilim Admin kullanıcı oluşturma ve rol atama yönetimidir.

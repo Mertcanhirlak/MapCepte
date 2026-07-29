@@ -10,4 +10,6 @@ public interface IPasswordHashService
         User user,
         string passwordHash,
         string providedPassword);
+
+    void PerformDummyVerification(string providedPassword);
 }

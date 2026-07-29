@@ -6,6 +6,7 @@ namespace Transport.Api.Identity;
 public sealed partial class AdminBootstrapHostedService(
     IServiceScopeFactory scopeFactory,
     IOptions<BootstrapAdminOptions> options,
+    IHostEnvironment environment,
     ILogger<AdminBootstrapHostedService> logger)
     : IHostedService
 {
@@ -24,7 +25,10 @@ public sealed partial class AdminBootstrapHostedService(
             new BootstrapAdminCommand(
                 options.Value.Email,
                 options.Value.DisplayName,
-                options.Value.Password),
+                options.Value.Password,
+                AllowWeakPassword:
+                    options.Value.AllowWeakPasswordInDevelopment
+                    && environment.IsDevelopment()),
             cancellationToken);
 
         if (result.Status == BootstrapAdminStatus.Created)

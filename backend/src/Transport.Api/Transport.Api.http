@@ -1,6 +1,21 @@
 @Transport.Api_HostAddress = http://localhost:5268
 
-GET {{Transport.Api_HostAddress}}/weatherforecast/
+GET {{Transport.Api_HostAddress}}/health/ready
+Accept: application/json
+
+###
+
+GET {{Transport.Api_HostAddress}}/api/auth/csrf
+Accept: application/json
+
+###
+
+GET {{Transport.Api_HostAddress}}/api/auth/me
+Accept: application/json
+
+###
+
+GET {{Transport.Api_HostAddress}}/api/admin/roles
 Accept: application/json
 
 ###

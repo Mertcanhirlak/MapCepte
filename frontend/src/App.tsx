@@ -1,5 +1,19 @@
-import { lazy, Suspense, useCallback, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
+import {
+  Navigate,
+  NavLink,
+  Outlet,
+  Route,
+  Routes,
+} from 'react-router-dom'
 import './App.css'
+import { AdminRolesPage } from './features/admin/AdminRolesPage'
+import { useAuth } from './features/auth/authState'
+import { LoginPage } from './features/auth/LoginPage'
+import {
+  PermissionRoute,
+  ProtectedRoute,
+} from './features/auth/ProtectedRoute'
 import { LayerPanel } from './features/map/LayerPanel'
 import {
   DEFAULT_LAYER_VISIBILITY,
@@ -20,11 +34,61 @@ const apiStatusCopy = {
   offline: 'API bekleniyor',
 } as const
 
-function App() {
+function AuthenticatedLayout() {
+  const { user, hasPermission, isSubmitting, logout } = useAuth()
+  const apiStatus = useApiStatus()
+
+  return (
+    <div className="app-shell">
+      <header className="topbar">
+        <NavLink className="brand-lockup brand-link" to="/">
+          <div className="brand-mark" aria-hidden="true">MC</div>
+          <div>
+            <p className="eyebrow">Ulaşım yönetim platformu</p>
+            <h1>MapCepte</h1>
+          </div>
+        </NavLink>
+
+        <div className="topbar-status">
+          <span className={`api-status api-status-${apiStatus}`}>
+            <i aria-hidden="true" />
+            {apiStatusCopy[apiStatus]}
+          </span>
+          <div className="user-summary">
+            <strong>{user?.displayName}</strong>
+            <span>{user?.roles.join(', ')}</span>
+          </div>
+          <button
+            className="logout-button"
+            disabled={isSubmitting}
+            onClick={() => void logout()}
+            type="button"
+          >
+            Çıkış
+          </button>
+        </div>
+      </header>
+
+      <nav className="primary-nav" aria-label="Ana menü">
+        <NavLink end to="/">Operasyon haritası</NavLink>
+        {hasPermission('roles.read') && (
+          <NavLink to="/admin/roles">Rol yönetimi</NavLink>
+        )}
+      </nav>
+
+      <Outlet />
+    </div>
+  )
+}
+
+function MapPage() {
   const [visibility, setVisibility] = useState<LayerVisibility>(
     DEFAULT_LAYER_VISIBILITY,
   )
-  const apiStatus = useApiStatus()
+
+  useEffect(() => {
+    document.title = 'Operasyon Haritası · MapCepte'
+  }, [])
 
   const toggleLayer = useCallback((layerId: OperationalLayerId) => {
     setVisibility((current) => ({
@@ -34,92 +98,86 @@ function App() {
   }, [])
 
   return (
-    <div className="app-shell">
-      <header className="topbar">
-        <div className="brand-lockup">
-          <div className="brand-mark" aria-hidden="true">
-            MC
-          </div>
-          <div>
-            <p className="eyebrow">Ulaşım yönetim platformu</p>
-            <h1>MapCepte</h1>
-          </div>
-        </div>
+    <main className="workspace">
+      <aside className="sidebar">
+        <section className="intro-card">
+          <p className="eyebrow">Operasyon merkezi</p>
+          <h2>Ulaşım verisini katmanlar halinde yönetin.</h2>
+          <p>
+            Duraklar, güzergâhlar, rotalar ve gelecekte canlı araçlar aynı
+            harita üzerinde bağımsız katmanlar olarak çalışır.
+          </p>
 
-        <div className="topbar-status">
-          <span className="phase-badge">Faz 0 · Temel</span>
-          <span className={`api-status api-status-${apiStatus}`}>
-            <i aria-hidden="true" />
-            {apiStatusCopy[apiStatus]}
-          </span>
-        </div>
-      </header>
-
-      <main className="workspace">
-        <aside className="sidebar">
-          <section className="intro-card">
-            <p className="eyebrow">Teknik temel</p>
-            <h2>Bağımsız uygulamalar, ortak ulaşım verisi.</h2>
-            <p>
-              React arayüzü katman görünümünü yönetir. .NET 10 API, PostGIS ve
-              ileride rota motoruyla konuşur.
-            </p>
-
-            <dl className="stack-list">
-              <div>
-                <dt>Backend</dt>
-                <dd>.NET 10</dd>
-              </div>
-              <div>
-                <dt>Veri</dt>
-                <dd>PostGIS</dd>
-              </div>
-              <div>
-                <dt>Harita</dt>
-                <dd>MapLibre</dd>
-              </div>
-            </dl>
-          </section>
-
-          <LayerPanel visibility={visibility} onToggle={toggleLayer} />
-
-          <section className="connection-card" aria-label="API bağlantısı">
-            <span>Frontend bağlantı hedefi</span>
-            <code>{API_BASE_URL}</code>
-            <p>Adres, frontend `.env` dosyasından değiştirilebilir.</p>
-          </section>
-        </aside>
-
-        <section className="map-section" aria-labelledby="map-heading">
-          <div className="map-toolbar">
+          <dl className="stack-list">
             <div>
-              <p className="eyebrow">Operasyon görünümü</p>
-              <h2 id="map-heading">Türkiye ulaşım haritası</h2>
+              <dt>Backend</dt>
+              <dd>.NET 10</dd>
             </div>
-            <div className="map-legend" aria-label="Harita katman özeti">
-              <span>
-                <i className="legend-route" aria-hidden="true" />
-                Rota
-              </span>
-              <span>
-                <i className="legend-stop" aria-hidden="true" />
-                Durak
-              </span>
+            <div>
+              <dt>Veri</dt>
+              <dd>PostGIS</dd>
             </div>
-          </div>
-
-          <Suspense
-            fallback={
-              <div className="map-frame map-loading" role="status">
-                Harita modülü yükleniyor…
-              </div>
-            }
-          >
-            <TransportMap visibility={visibility} />
-          </Suspense>
+            <div>
+              <dt>Harita</dt>
+              <dd>MapLibre</dd>
+            </div>
+          </dl>
         </section>
-      </main>
-    </div>
+
+        <LayerPanel visibility={visibility} onToggle={toggleLayer} />
+
+        <section className="connection-card" aria-label="API bağlantısı">
+          <span>Frontend bağlantı hedefi</span>
+          <code>{API_BASE_URL || 'Aynı origin · Vite proxy'}</code>
+          <p>Adres, frontend `.env` dosyasından değiştirilebilir.</p>
+        </section>
+      </aside>
+
+      <section className="map-section" aria-labelledby="map-heading">
+        <div className="map-toolbar">
+          <div>
+            <p className="eyebrow">Operasyon görünümü</p>
+            <h2 id="map-heading">Türkiye ulaşım haritası</h2>
+          </div>
+          <div className="map-legend" aria-label="Harita katman özeti">
+            <span><i className="legend-route" aria-hidden="true" />Rota</span>
+            <span><i className="legend-stop" aria-hidden="true" />Durak</span>
+          </div>
+        </div>
+
+        <Suspense
+          fallback={
+            <div className="map-frame map-loading" role="status">
+              Harita modülü yükleniyor…
+            </div>
+          }
+        >
+          <TransportMap visibility={visibility} />
+        </Suspense>
+      </section>
+    </main>
+  )
+}
+
+function App() {
+  return (
+    <Routes>
+      <Route path="/login" element={<LoginPage />} />
+      <Route element={<ProtectedRoute />}>
+        <Route element={<AuthenticatedLayout />}>
+          <Route index element={<MapPage />} />
+          <Route
+            path="/admin/roles"
+            element={
+              <PermissionRoute permission="roles.read">
+                <AdminRolesPage />
+              </PermissionRoute>
+            }
+          />
+        </Route>
+      </Route>
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   )
 }
 

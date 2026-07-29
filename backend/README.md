@@ -82,7 +82,30 @@ Remove-Item Env:BootstrapAdmin__Password
 Remove-Variable securePassword
 ```
 
-Parola 12-128 karakter olmalı; büyük harf, küçük harf, rakam ve sembol içermelidir. İkinci çalıştırma yeni bir Admin oluşturmaz. Normal API başlangıcında `BootstrapAdmin__Enabled` kapalı kalmalıdır.
+Production parolası 12-128 karakter olmalı; büyük harf, küçük harf, rakam ve sembol içermelidir. `appsettings.Development.json` yerel geliştirmede en az 6 karakterlik basit bootstrap parolasına açıkça izin verir; bu override production ortamında çalışmaz. İkinci çalıştırma yeni bir Admin oluşturmaz. Normal API başlangıcında `BootstrapAdmin__Enabled` kapalı kalmalıdır.
+
+## Oturum API'si
+
+Tarayıcı oturumu şifreli ve `HttpOnly` cookie ile korunur. JavaScript cookie değerini okuyamaz; frontend bütün API isteklerinde `credentials: "include"` kullanır.
+
+1. `GET /api/auth/csrf` ile CSRF token alınır.
+2. Token `X-CSRF-TOKEN` header'ında gönderilerek `POST /api/auth/login` çağrılır.
+3. Login sonrasında kimlik değiştiği için `/api/auth/csrf` tekrar çağrılır.
+4. `GET /api/auth/me` mevcut kullanıcı, roller ve permission'ları döndürür.
+5. Güncel CSRF token ile `POST /api/auth/logout` oturumu kapatır.
+
+Oturum 15 dakika geçerlidir ve aktif kullanımda güvenli biçimde yenilenir. Login denemeleri IP başına dakikada beş istekle sınırlandırılmıştır. Üretimde cookie yalnızca HTTPS üzerinden gönderilir.
+
+## Permission korumalı API
+
+Endpoint'ler yalnızca role adına göre değil, oturum cookie'sindeki permission claim'lerine göre korunur. Örneğin:
+
+- `GET /api/admin/roles`, `roles.read` permission'ı ister.
+- Oturumu olmayan çağrı `401 Unauthorized` döndürür.
+- Oturumu bulunan fakat permission'ı olmayan kullanıcı `403 Forbidden` alır.
+- Permission'a sahip Admin rol ve permission kataloğunu okuyabilir.
+
+Yeni bir endpoint'e koruma eklemek için endpoint tanımında `RequirePermission(PermissionNames.<Permission>)` kullanılır.
 
 ## Build ve test
 

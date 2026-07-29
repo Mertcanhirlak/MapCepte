@@ -2,9 +2,11 @@ import { useEffect, useState } from 'react'
 
 export type ApiStatus = 'checking' | 'online' | 'offline'
 
-export const API_BASE_URL = (
-  import.meta.env.VITE_API_BASE_URL || 'http://localhost:5268'
-).replace(/\/$/, '')
+const configuredApiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim()
+
+export const API_BASE_URL = configuredApiBaseUrl
+  ? configuredApiBaseUrl.replace(/\/$/, '')
+  : ''
 
 export function useApiStatus(): ApiStatus {
   const [status, setStatus] = useState<ApiStatus>('checking')

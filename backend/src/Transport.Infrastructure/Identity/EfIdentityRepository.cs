@@ -30,6 +30,42 @@ public sealed class EfIdentityRepository(TransportDbContext dbContext)
                 cancellationToken);
     }
 
+    public async Task<UserAuthenticationData?> FindUserAuthenticationDataAsync(
+        string normalizedEmail,
+        CancellationToken cancellationToken)
+    {
+        var user = await dbContext.Users
+            .Include(candidate => candidate.UserRoles)
+                .ThenInclude(userRole => userRole.Role)
+                    .ThenInclude(role => role.RolePermissions)
+                        .ThenInclude(rolePermission =>
+                            rolePermission.Permission)
+            .AsSplitQuery()
+            .SingleOrDefaultAsync(
+                candidate => candidate.NormalizedEmail == normalizedEmail,
+                cancellationToken);
+
+        if (user is null)
+        {
+            return null;
+        }
+
+        var roles = user.UserRoles
+            .Select(userRole => userRole.Role.Name)
+            .Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+
+        var permissions = user.UserRoles
+            .SelectMany(userRole => userRole.Role.RolePermissions)
+            .Select(rolePermission => rolePermission.Permission.Code)
+            .Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+
+        return new UserAuthenticationData(user, roles, permissions);
+    }
+
     public Task<Role?> FindRoleByNormalizedNameAsync(
         string normalizedName,
         CancellationToken cancellationToken)
@@ -38,6 +74,31 @@ public sealed class EfIdentityRepository(TransportDbContext dbContext)
             .SingleOrDefaultAsync(
                 role => role.NormalizedName == normalizedName,
                 cancellationToken);
+    }
+
+    public async Task<IReadOnlyCollection<RoleCatalogItem>> ListRolesAsync(
+        CancellationToken cancellationToken)
+    {
+        var roles = await dbContext.Roles
+            .AsNoTracking()
+            .Include(role => role.RolePermissions)
+                .ThenInclude(rolePermission => rolePermission.Permission)
+            .AsSplitQuery()
+            .OrderBy(role => role.Name)
+            .ToListAsync(cancellationToken);
+
+        return roles
+            .Select(role => new RoleCatalogItem(
+                role.Id,
+                role.Name,
+                role.Description,
+                role.IsSystem,
+                role.RolePermissions
+                    .Select(rolePermission =>
+                        rolePermission.Permission.Code)
+                    .Order(StringComparer.Ordinal)
+                    .ToArray()))
+            .ToArray();
     }
 
     public async Task AddUserAsync(

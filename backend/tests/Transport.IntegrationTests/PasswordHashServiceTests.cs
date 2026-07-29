@@ -33,5 +33,7 @@ public sealed class PasswordHashServiceTests
                 user,
                 hash,
                 "Wrong-Password-2026!"));
+
+        service.PerformDummyVerification("Unknown-Password-2026!");
     }
 }

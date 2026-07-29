@@ -10,8 +10,15 @@ public interface IIdentityRepository
         string normalizedEmail,
         CancellationToken cancellationToken);
 
+    Task<UserAuthenticationData?> FindUserAuthenticationDataAsync(
+        string normalizedEmail,
+        CancellationToken cancellationToken);
+
     Task<Role?> FindRoleByNormalizedNameAsync(
         string normalizedName,
+        CancellationToken cancellationToken);
+
+    Task<IReadOnlyCollection<RoleCatalogItem>> ListRolesAsync(
         CancellationToken cancellationToken);
 
     Task AddUserAsync(User user, CancellationToken cancellationToken);

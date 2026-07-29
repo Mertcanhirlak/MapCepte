@@ -82,11 +82,20 @@ public sealed class AdminBootstrapService(
                 nameof(command));
         }
 
-        ValidatePassword(command.Password);
+        ValidatePassword(command.Password, command.AllowWeakPassword);
     }
 
-    private static void ValidatePassword(string password)
+    private static void ValidatePassword(
+        string password,
+        bool allowWeakPassword)
     {
+        if (allowWeakPassword
+            && !string.IsNullOrWhiteSpace(password)
+            && password.Length is >= 6 and <= 128)
+        {
+            return;
+        }
+
         var isValid = !string.IsNullOrEmpty(password)
             && password.Length is >= 12 and <= 128
             && password.Any(char.IsUpper)
@@ -98,7 +107,7 @@ public sealed class AdminBootstrapService(
         if (!isValid)
         {
             throw new ArgumentException(
-                "Bootstrap password must be 12-128 characters and include upper-case, lower-case, number, and symbol characters.",
+                "Bootstrap password must be 12-128 characters and include upper-case, lower-case, number, and symbol characters. Development-only weak passwords must contain at least 6 characters.",
                 nameof(password));
         }
     }

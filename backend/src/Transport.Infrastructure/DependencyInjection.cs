@@ -30,6 +30,8 @@ public static class DependencyInjection
         services.AddScoped<IPasswordHashService, AspNetPasswordHashService>();
         services.AddScoped<IIdentityRepository, EfIdentityRepository>();
         services.AddScoped<AdminBootstrapService>();
+        services.AddScoped<LoginService>();
+        services.AddScoped<RoleCatalogService>();
         services.TryAddSingleton(TimeProvider.System);
 
         return services;

@@ -18,7 +18,16 @@ npm run dev
 
 Uygulama `http://localhost:5173` adresinde açılır.
 
-`.env` içindeki `VITE_API_BASE_URL`, ayrı çalışan .NET API adresini belirtir. Backend çalışmıyorsa arayüz açılmaya devam eder ancak API durumu “bekleniyor” görünür.
+Development ortamında `VITE_API_BASE_URL` boş bırakılır; Vite `/api` ve `/health` isteklerini `http://localhost:5268` adresine aynı-origin proxy üzerinden taşır. Bu düzen, `localhost` ile `127.0.0.1` farkının güvenli cookie/CSRF akışını bozmasını engeller. Ayrı origin kullanan bir deployment'ta API adresi `VITE_API_BASE_URL` ile açıkça verilebilir.
+
+## Giriş ve oturum
+
+- `/login`, e-posta ve parola ile güvenli oturum açar.
+- Frontend önce `/api/auth/csrf` üzerinden token alır; login/logout isteklerinde `X-CSRF-TOKEN` gönderir.
+- Bütün API çağrıları `credentials: "include"` kullanır. Şifreli `HttpOnly` authentication cookie'si JavaScript tarafından okunmaz.
+- Uygulama açılırken `/api/auth/me` çağrılır. Oturumu olmayan kullanıcı korumalı sayfalardan `/login` sayfasına yönlendirilir.
+- `roles.read` permission'ına sahip kullanıcı `/admin/roles` menüsünü ve salt okunur rol kataloğunu görebilir.
+- Arayüzde menü gizleme güvenlik sınırı değildir; backend endpoint'i aynı permission'ı ayrıca zorunlu tutar.
 
 ## Kontroller
 
@@ -37,3 +46,5 @@ npm run build
 5. Canlı araçlar
 
 Katman kataloğu `src/features/map/mapLayers.ts`, MapLibre kurulumu ise `src/features/map/TransportMap.tsx` içindedir.
+
+Auth akışı `src/features/auth`, rol kataloğu görünümü ise `src/features/admin` altında bulunur.
