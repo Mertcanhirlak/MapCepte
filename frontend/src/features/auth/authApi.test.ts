@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { authApi, resetAuthApiForTests } from './authApi'
+import { authApi, csrfRequest, resetAuthApiForTests } from './authApi'
 
 const user = {
   id: 'a27d33fb-f334-421b-ab0e-748fc78dacd6',
@@ -70,5 +70,23 @@ describe('authApi', () => {
       method: 'POST',
       credentials: 'include',
     })
+  })
+
+  it('adds a CSRF token to protected write requests', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ token: 'write-token' }))
+      .mockResolvedValueOnce(jsonResponse({ id: 'created-user' }, 201))
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    await csrfRequest('/api/admin/users', {
+      method: 'POST',
+      body: JSON.stringify({ email: 'user@example.com' }),
+    })
+
+    const headers = fetchMock.mock.calls[1]?.[1]?.headers as Headers
+    expect(headers.get('X-CSRF-TOKEN')).toBe('write-token')
+    expect(fetchMock.mock.calls[1]?.[0]).toBe('/api/admin/users')
   })
 })

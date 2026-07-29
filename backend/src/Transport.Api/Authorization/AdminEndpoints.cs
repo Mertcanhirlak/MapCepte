@@ -1,3 +1,7 @@
+using System.Security.Claims;
+using Microsoft.AspNetCore.Antiforgery;
+using Microsoft.Extensions.Options;
+using Transport.Api.Identity;
 using Transport.Application.Identity;
 using Transport.Domain.Identity;
 
@@ -31,6 +35,134 @@ public static class AdminEndpoints
                 })
             .RequirePermission(PermissionNames.RolesRead);
 
+        group.MapGet(
+                "/users",
+                async (
+                    UserManagementService userManagementService,
+                    CancellationToken cancellationToken) =>
+                {
+                    var users = await userManagementService.ListAsync(
+                        cancellationToken);
+
+                    return TypedResults.Ok(users.Select(ToResponse));
+                })
+            .RequirePermission(PermissionNames.UsersRead);
+
+        group.MapPost(
+                "/users",
+                async (
+                    CreateUserRequest request,
+                    UserManagementService userManagementService,
+                    IOptions<IdentitySecurityOptions> securityOptions,
+                    IHostEnvironment environment,
+                    IAntiforgery antiforgery,
+                    HttpContext httpContext,
+                    CancellationToken cancellationToken) =>
+                {
+                    if (!await antiforgery.IsRequestValidAsync(httpContext))
+                    {
+                        return Results.BadRequest();
+                    }
+
+                    var result = await userManagementService.CreateAsync(
+                        new CreateUserCommand(
+                            request.Email,
+                            request.DisplayName,
+                            request.Password,
+                            request.Roles,
+                            AllowWeakPassword:
+                                environment.IsDevelopment()
+                                && securityOptions.Value
+                                    .AllowWeakPasswordsInDevelopment),
+                        cancellationToken);
+
+                    return ToHttpResult(result, created: true);
+                })
+            .RequirePermission(PermissionNames.UsersManage)
+            .RequirePermission(PermissionNames.RolesManage);
+
+        group.MapPut(
+                "/users/{userId:guid}/roles",
+                async (
+                    Guid userId,
+                    UpdateUserRolesRequest request,
+                    ClaimsPrincipal principal,
+                    UserManagementService userManagementService,
+                    IAntiforgery antiforgery,
+                    HttpContext httpContext,
+                    CancellationToken cancellationToken) =>
+                {
+                    if (!await antiforgery.IsRequestValidAsync(httpContext))
+                    {
+                        return Results.BadRequest();
+                    }
+
+                    if (!Guid.TryParse(
+                            principal.FindFirstValue(
+                                ClaimTypes.NameIdentifier),
+                            out var actorUserId))
+                    {
+                        return Results.Unauthorized();
+                    }
+
+                    var result =
+                        await userManagementService.UpdateRolesAsync(
+                            new UpdateUserRolesCommand(
+                                actorUserId,
+                                userId,
+                                request.Roles),
+                            cancellationToken);
+
+                    return ToHttpResult(result, created: false);
+                })
+            .RequirePermission(PermissionNames.UsersManage)
+            .RequirePermission(PermissionNames.RolesManage);
+
         return endpoints;
+    }
+
+    private static IResult ToHttpResult(
+        UserManagementResult result,
+        bool created)
+    {
+        if (result.Status == UserManagementStatus.Success
+            && result.User is not null)
+        {
+            var response = ToResponse(result.User);
+            return created
+                ? Results.Created(
+                    $"/api/admin/users/{result.User.Id}",
+                    response)
+                : Results.Ok(response);
+        }
+
+        return result.Status switch
+        {
+            UserManagementStatus.DuplicateEmail => Results.Conflict(
+                new { error = result.Error }),
+            UserManagementStatus.UserNotFound => Results.NotFound(
+                new { error = result.Error }),
+            UserManagementStatus.SelfRoleChangeForbidden =>
+                Results.Json(
+                    new { error = result.Error },
+                    statusCode: StatusCodes.Status403Forbidden),
+            UserManagementStatus.InvalidInput
+                or UserManagementStatus.UnknownRole => Results.BadRequest(
+                    new { error = result.Error }),
+            _ => Results.Problem(
+                statusCode:
+                    StatusCodes.Status500InternalServerError),
+        };
+    }
+
+    private static UserCatalogResponse ToResponse(UserCatalogItem user)
+    {
+        return new UserCatalogResponse(
+            user.Id,
+            user.Email,
+            user.DisplayName,
+            user.IsActive,
+            user.CreatedAtUtc,
+            user.Roles);
     }
 }

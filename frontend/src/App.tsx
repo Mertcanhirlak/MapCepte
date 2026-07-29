@@ -8,6 +8,7 @@ import {
 } from 'react-router-dom'
 import './App.css'
 import { AdminRolesPage } from './features/admin/AdminRolesPage'
+import { AdminUsersPage } from './features/admin/AdminUsersPage'
 import { useAuth } from './features/auth/authState'
 import { LoginPage } from './features/auth/LoginPage'
 import {
@@ -73,6 +74,9 @@ function AuthenticatedLayout() {
         <NavLink end to="/">Operasyon haritası</NavLink>
         {hasPermission('roles.read') && (
           <NavLink to="/admin/roles">Rol yönetimi</NavLink>
+        )}
+        {hasPermission('users.read') && hasPermission('roles.read') && (
+          <NavLink to="/admin/users">Kullanıcı yönetimi</NavLink>
         )}
       </nav>
 
@@ -171,6 +175,16 @@ function App() {
             element={
               <PermissionRoute permission="roles.read">
                 <AdminRolesPage />
+              </PermissionRoute>
+            }
+          />
+          <Route
+            path="/admin/users"
+            element={
+              <PermissionRoute permission="users.read">
+                <PermissionRoute permission="roles.read">
+                  <AdminUsersPage />
+                </PermissionRoute>
               </PermissionRoute>
             }
           />

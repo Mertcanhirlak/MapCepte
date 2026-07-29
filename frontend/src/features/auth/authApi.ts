@@ -26,8 +26,15 @@ let csrfToken: string | null = null
 
 async function readError(response: Response): Promise<string> {
   try {
-    const problem = (await response.json()) as { title?: string }
-    return problem.title || `API isteği başarısız oldu (${response.status}).`
+    const problem = (await response.json()) as {
+      title?: string
+      error?: string
+    }
+    return (
+      problem.error ||
+      problem.title ||
+      `API isteği başarısız oldu (${response.status}).`
+    )
   } catch {
     return `API isteği başarısız oldu (${response.status}).`
   }
@@ -71,6 +78,20 @@ async function currentCsrfToken(): Promise<string> {
   return csrfToken ?? refreshCsrfToken()
 }
 
+export async function csrfRequest<T>(
+  path: string,
+  init: RequestInit,
+): Promise<T> {
+  const token = await currentCsrfToken()
+  const headers = new Headers(init.headers)
+  headers.set('X-CSRF-TOKEN', token)
+
+  return apiRequest<T>(path, {
+    ...init,
+    headers,
+  })
+}
+
 export const authApi = {
   getCurrentUser: () =>
     apiRequest<AuthenticatedUser>('/api/auth/me'),
@@ -89,10 +110,8 @@ export const authApi = {
   },
 
   async logout() {
-    const token = await currentCsrfToken()
-    await apiRequest<void>('/api/auth/logout', {
+    await csrfRequest<void>('/api/auth/logout', {
       method: 'POST',
-      headers: { 'X-CSRF-TOKEN': token },
     })
     csrfToken = null
   },

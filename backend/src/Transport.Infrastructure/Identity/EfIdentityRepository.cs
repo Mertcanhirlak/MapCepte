@@ -30,6 +30,17 @@ public sealed class EfIdentityRepository(TransportDbContext dbContext)
                 cancellationToken);
     }
 
+    public Task<User?> FindUserByIdAsync(
+        Guid userId,
+        CancellationToken cancellationToken)
+    {
+        return dbContext.Users
+            .Include(user => user.UserRoles)
+            .SingleOrDefaultAsync(
+                user => user.Id == userId,
+                cancellationToken);
+    }
+
     public async Task<UserAuthenticationData?> FindUserAuthenticationDataAsync(
         string normalizedEmail,
         CancellationToken cancellationToken)
@@ -96,6 +107,32 @@ public sealed class EfIdentityRepository(TransportDbContext dbContext)
                 role.RolePermissions
                     .Select(rolePermission =>
                         rolePermission.Permission.Code)
+                    .Order(StringComparer.Ordinal)
+                    .ToArray()))
+            .ToArray();
+    }
+
+    public async Task<IReadOnlyCollection<UserCatalogItem>> ListUsersAsync(
+        CancellationToken cancellationToken)
+    {
+        var users = await dbContext.Users
+            .AsNoTracking()
+            .Include(user => user.UserRoles)
+                .ThenInclude(userRole => userRole.Role)
+            .AsSplitQuery()
+            .OrderBy(user => user.DisplayName)
+            .ThenBy(user => user.Email)
+            .ToListAsync(cancellationToken);
+
+        return users
+            .Select(user => new UserCatalogItem(
+                user.Id,
+                user.Email,
+                user.DisplayName,
+                user.IsActive,
+                user.CreatedAtUtc,
+                user.UserRoles
+                    .Select(userRole => userRole.Role.Name)
                     .Order(StringComparer.Ordinal)
                     .ToArray()))
             .ToArray();

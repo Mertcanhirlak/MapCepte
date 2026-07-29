@@ -27,6 +27,8 @@ Development ortamında `VITE_API_BASE_URL` boş bırakılır; Vite `/api` ve `/h
 - Bütün API çağrıları `credentials: "include"` kullanır. Şifreli `HttpOnly` authentication cookie'si JavaScript tarafından okunmaz.
 - Uygulama açılırken `/api/auth/me` çağrılır. Oturumu olmayan kullanıcı korumalı sayfalardan `/login` sayfasına yönlendirilir.
 - `roles.read` permission'ına sahip kullanıcı `/admin/roles` menüsünü ve salt okunur rol kataloğunu görebilir.
+- `users.read` ve `roles.read` permission'larına sahip kullanıcı `/admin/users` sayfasını görebilir; `users.manage` ile `roles.manage` birlikte varsa kullanıcı oluşturabilir ve başka kullanıcıların rollerini değiştirebilir.
+- Yönetici kendi rollerini arayüzden değiştiremez; backend aynı kuralı ayrıca zorunlu tutar.
 - Arayüzde menü gizleme güvenlik sınırı değildir; backend endpoint'i aynı permission'ı ayrıca zorunlu tutar.
 
 ## Kontroller
@@ -47,4 +49,4 @@ npm run build
 
 Katman kataloğu `src/features/map/mapLayers.ts`, MapLibre kurulumu ise `src/features/map/TransportMap.tsx` içindedir.
 
-Auth akışı `src/features/auth`, rol kataloğu görünümü ise `src/features/admin` altında bulunur.
+Auth akışı `src/features/auth`, rol ve kullanıcı yönetimi görünümleri ise `src/features/admin` altında bulunur.

@@ -10,6 +10,10 @@ public interface IIdentityRepository
         string normalizedEmail,
         CancellationToken cancellationToken);
 
+    Task<User?> FindUserByIdAsync(
+        Guid userId,
+        CancellationToken cancellationToken);
+
     Task<UserAuthenticationData?> FindUserAuthenticationDataAsync(
         string normalizedEmail,
         CancellationToken cancellationToken);
@@ -19,6 +23,9 @@ public interface IIdentityRepository
         CancellationToken cancellationToken);
 
     Task<IReadOnlyCollection<RoleCatalogItem>> ListRolesAsync(
+        CancellationToken cancellationToken);
+
+    Task<IReadOnlyCollection<UserCatalogItem>> ListUsersAsync(
         CancellationToken cancellationToken);
 
     Task AddUserAsync(User user, CancellationToken cancellationToken);

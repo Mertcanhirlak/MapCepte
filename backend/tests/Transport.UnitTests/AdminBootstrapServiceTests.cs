@@ -155,6 +155,13 @@ public sealed class AdminBootstrapServiceTests
             return Task.FromResult<User?>(null);
         }
 
+        public Task<User?> FindUserByIdAsync(
+            Guid userId,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult<User?>(null);
+        }
+
         public Task<Role?> FindRoleByNormalizedNameAsync(
             string normalizedName,
             CancellationToken cancellationToken)
@@ -166,6 +173,12 @@ public sealed class AdminBootstrapServiceTests
             CancellationToken cancellationToken)
         {
             return Task.FromResult<IReadOnlyCollection<RoleCatalogItem>>([]);
+        }
+
+        public Task<IReadOnlyCollection<UserCatalogItem>> ListUsersAsync(
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult<IReadOnlyCollection<UserCatalogItem>>([]);
         }
 
         public Task<UserAuthenticationData?> FindUserAuthenticationDataAsync(

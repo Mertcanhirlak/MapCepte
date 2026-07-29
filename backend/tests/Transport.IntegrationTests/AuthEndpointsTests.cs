@@ -37,7 +37,12 @@ public sealed class AuthEndpointsTests
         var adminAuthenticationData = new UserAuthenticationData(
             admin,
             [SystemRoleNames.Admin],
-            [PermissionNames.UsersManage, PermissionNames.RolesRead]);
+            [
+                PermissionNames.UsersRead,
+                PermissionNames.UsersManage,
+                PermissionNames.RolesRead,
+                PermissionNames.RolesManage,
+            ]);
 
         var operatorAuthenticationData = new UserAuthenticationData(
             operatorUser,
@@ -56,6 +61,12 @@ public sealed class AuthEndpointsTests
                 Guid.Parse("22222222-2222-2222-2222-222222222222"),
                 SystemRoleNames.Operator,
                 "Transport operator",
+                IsSystem: true,
+                [PermissionNames.StopsRead]),
+            new(
+                Guid.Parse("33333333-3333-3333-3333-333333333333"),
+                SystemRoleNames.User,
+                "Passenger",
                 IsSystem: true,
                 [PermissionNames.StopsRead]),
         };
@@ -94,6 +105,10 @@ public sealed class AuthEndpointsTests
         Assert.Equal(
             HttpStatusCode.Unauthorized,
             anonymousRoles.StatusCode);
+        var anonymousUsers = await _client.GetAsync("/api/admin/users");
+        Assert.Equal(
+            HttpStatusCode.Unauthorized,
+            anonymousUsers.StatusCode);
 
         var csrfResponse = await _client.GetAsync("/api/auth/csrf");
         var csrfBody = await csrfResponse.Content.ReadAsStringAsync();
@@ -159,6 +174,79 @@ public sealed class AuthEndpointsTests
         var response = await _client.GetAsync("/api/admin/roles");
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        var usersResponse = await _client.GetAsync("/api/admin/users");
+        Assert.Equal(HttpStatusCode.Forbidden, usersResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task AdminCanListCreateAndAssignUserRoles()
+    {
+        await LoginAsync("admin@example.com");
+        await RefreshCsrfAsync();
+
+        var initialUsers =
+            await _client.GetFromJsonAsync<UserCatalogResponse[]>(
+                "/api/admin/users");
+        Assert.NotNull(initialUsers);
+        Assert.Equal(2, initialUsers.Length);
+
+        var create = await _client.PostAsJsonAsync(
+            "/api/admin/users",
+            new CreateUserRequest(
+                "new.operator@example.com",
+                "New Operator",
+                "Strong-Password-2026!",
+                [SystemRoleNames.Operator]));
+
+        Assert.Equal(HttpStatusCode.Created, create.StatusCode);
+        var created =
+            await create.Content.ReadFromJsonAsync<UserCatalogResponse>();
+        Assert.NotNull(created);
+        Assert.Contains(SystemRoleNames.Operator, created.Roles);
+
+        var update = await _client.PutAsJsonAsync(
+            $"/api/admin/users/{created.Id}/roles",
+            new UpdateUserRolesRequest([SystemRoleNames.User]));
+
+        Assert.Equal(HttpStatusCode.OK, update.StatusCode);
+        var updated =
+            await update.Content.ReadFromJsonAsync<UserCatalogResponse>();
+        Assert.NotNull(updated);
+        Assert.Equal([SystemRoleNames.User], updated.Roles);
+    }
+
+    [Fact]
+    public async Task AdminCannotChangeOwnRoles()
+    {
+        await LoginAsync("admin@example.com");
+        await RefreshCsrfAsync();
+
+        var me = await _client.GetFromJsonAsync<AuthenticatedUserResponse>(
+            "/api/auth/me");
+        Assert.NotNull(me);
+
+        var response = await _client.PutAsJsonAsync(
+            $"/api/admin/users/{me.Id}/roles",
+            new UpdateUserRolesRequest([SystemRoleNames.User]));
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task AdminUserWriteWithoutCsrfIsRejected()
+    {
+        await LoginAsync("admin@example.com");
+        _client.DefaultRequestHeaders.Remove("X-CSRF-TOKEN");
+
+        var response = await _client.PostAsJsonAsync(
+            "/api/admin/users",
+            new CreateUserRequest(
+                "new.user@example.com",
+                "New User",
+                "Strong-Password-2026!",
+                [SystemRoleNames.User]));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
     [Fact]
@@ -188,6 +276,15 @@ public sealed class AuthEndpointsTests
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
+    private async Task RefreshCsrfAsync()
+    {
+        var csrf = await _client.GetFromJsonAsync<CsrfTokenResponse>(
+            "/api/auth/csrf");
+        Assert.NotNull(csrf);
+        _client.DefaultRequestHeaders.Remove("X-CSRF-TOKEN");
+        _client.DefaultRequestHeaders.Add("X-CSRF-TOKEN", csrf.Token);
+    }
+
     private sealed class AcceptingPasswordHashService : IPasswordHashService
     {
         public string HashPassword(User user, string password)
@@ -208,11 +305,19 @@ public sealed class AuthEndpointsTests
         }
     }
 
-    private sealed class FakeIdentityRepository(
-        IReadOnlyCollection<UserAuthenticationData> users,
-        IReadOnlyCollection<RoleCatalogItem> roles)
-        : IIdentityRepository
+    private sealed class FakeIdentityRepository : IIdentityRepository
     {
+        private readonly List<UserAuthenticationData> _users;
+        private readonly IReadOnlyCollection<RoleCatalogItem> _roles;
+
+        public FakeIdentityRepository(
+            IReadOnlyCollection<UserAuthenticationData> users,
+            IReadOnlyCollection<RoleCatalogItem> roles)
+        {
+            _users = [.. users];
+            _roles = roles;
+        }
+
         public Task<bool> HasAdminAsync(CancellationToken cancellationToken)
         {
             return Task.FromResult(true);
@@ -222,9 +327,20 @@ public sealed class AuthEndpointsTests
             string normalizedEmail,
             CancellationToken cancellationToken)
         {
-            var user = users
+            var user = _users
                 .SingleOrDefault(candidate =>
                     candidate.User.NormalizedEmail == normalizedEmail)
+                ?.User;
+            return Task.FromResult(user);
+        }
+
+        public Task<User?> FindUserByIdAsync(
+            Guid userId,
+            CancellationToken cancellationToken)
+        {
+            var user = _users
+                .SingleOrDefault(candidate =>
+                    candidate.User.Id == userId)
                 ?.User;
             return Task.FromResult(user);
         }
@@ -234,7 +350,7 @@ public sealed class AuthEndpointsTests
             CancellationToken cancellationToken)
         {
             return Task.FromResult(
-                users.SingleOrDefault(candidate =>
+                _users.SingleOrDefault(candidate =>
                     candidate.User.NormalizedEmail == normalizedEmail));
         }
 
@@ -242,19 +358,52 @@ public sealed class AuthEndpointsTests
             string normalizedName,
             CancellationToken cancellationToken)
         {
-            return Task.FromResult<Role?>(null);
+            var role = _roles.SingleOrDefault(candidate =>
+                string.Equals(
+                    candidate.Name,
+                    normalizedName,
+                    StringComparison.OrdinalIgnoreCase));
+
+            return Task.FromResult(
+                role is null
+                    ? null
+                    : new Role(
+                        role.Id,
+                        role.Name,
+                        role.Description,
+                        role.IsSystem));
         }
 
         public Task<IReadOnlyCollection<RoleCatalogItem>> ListRolesAsync(
             CancellationToken cancellationToken)
         {
-            return Task.FromResult(roles);
+            return Task.FromResult(_roles);
+        }
+
+        public Task<IReadOnlyCollection<UserCatalogItem>> ListUsersAsync(
+            CancellationToken cancellationToken)
+        {
+            IReadOnlyCollection<UserCatalogItem> result = _users
+                .Select(candidate => new UserCatalogItem(
+                    candidate.User.Id,
+                    candidate.User.Email,
+                    candidate.User.DisplayName,
+                    candidate.User.IsActive,
+                    candidate.User.CreatedAtUtc,
+                    candidate.Roles))
+                .ToArray();
+            return Task.FromResult(result);
         }
 
         public Task AddUserAsync(
             User user,
             CancellationToken cancellationToken)
         {
+            var roleNames = user.UserRoles
+                .Select(userRole => _roles.Single(role =>
+                    role.Id == userRole.RoleId).Name)
+                .ToArray();
+            _users.Add(new UserAuthenticationData(user, roleNames, []));
             return Task.CompletedTask;
         }
 

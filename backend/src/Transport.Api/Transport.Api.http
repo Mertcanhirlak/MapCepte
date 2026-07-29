@@ -19,3 +19,31 @@ GET {{Transport.Api_HostAddress}}/api/admin/roles
 Accept: application/json
 
 ###
+
+GET {{Transport.Api_HostAddress}}/api/admin/users
+Accept: application/json
+
+###
+
+POST {{Transport.Api_HostAddress}}/api/admin/users
+Content-Type: application/json
+X-CSRF-TOKEN: {{CsrfToken}}
+
+{
+  "email": "operator@example.com",
+  "displayName": "Example Operator",
+  "password": "Strong-Password-2026!",
+  "roles": ["Operator"]
+}
+
+###
+
+PUT {{Transport.Api_HostAddress}}/api/admin/users/{{UserId}}/roles
+Content-Type: application/json
+X-CSRF-TOKEN: {{CsrfToken}}
+
+{
+  "roles": ["User"]
+}
+
+###

@@ -32,6 +32,7 @@ public static class DependencyInjection
         services.AddScoped<AdminBootstrapService>();
         services.AddScoped<LoginService>();
         services.AddScoped<RoleCatalogService>();
+        services.AddScoped<UserManagementService>();
         services.TryAddSingleton(TimeProvider.System);
 
         return services;

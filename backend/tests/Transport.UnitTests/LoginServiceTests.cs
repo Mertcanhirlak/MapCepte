@@ -148,6 +148,13 @@ public sealed class LoginServiceTests
             return Task.FromResult<User?>(authenticationData?.User);
         }
 
+        public Task<User?> FindUserByIdAsync(
+            Guid userId,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult<User?>(null);
+        }
+
         public Task<UserAuthenticationData?> FindUserAuthenticationDataAsync(
             string normalizedEmail,
             CancellationToken cancellationToken)
@@ -167,6 +174,12 @@ public sealed class LoginServiceTests
             CancellationToken cancellationToken)
         {
             return Task.FromResult<IReadOnlyCollection<RoleCatalogItem>>([]);
+        }
+
+        public Task<IReadOnlyCollection<UserCatalogItem>> ListUsersAsync(
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult<IReadOnlyCollection<UserCatalogItem>>([]);
         }
 
         public Task AddUserAsync(

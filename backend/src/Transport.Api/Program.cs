@@ -64,6 +64,9 @@ builder.Services.AddRateLimiter(options =>
 builder.Services
     .Configure<BootstrapAdminOptions>(
         builder.Configuration.GetSection(BootstrapAdminOptions.SectionName));
+builder.Services
+    .Configure<IdentitySecurityOptions>(
+        builder.Configuration.GetSection(IdentitySecurityOptions.SectionName));
 builder.Services.AddHostedService<AdminBootstrapHostedService>();
 builder.Services
     .AddHealthChecks()

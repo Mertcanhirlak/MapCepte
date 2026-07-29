@@ -67,6 +67,36 @@ public sealed class User
         UserRoles.Add(new UserRole(Id, roleId, assignedAtUtc));
     }
 
+    public void ReplaceRoles(
+        IEnumerable<Guid> roleIds,
+        DateTimeOffset assignedAtUtc)
+    {
+        ArgumentNullException.ThrowIfNull(roleIds);
+
+        var desiredRoleIds = roleIds.ToHashSet();
+
+        if (desiredRoleIds.Count == 0
+            || desiredRoleIds.Contains(Guid.Empty))
+        {
+            throw new ArgumentException(
+                "At least one valid role is required.",
+                nameof(roleIds));
+        }
+
+        foreach (var userRole in UserRoles
+                     .Where(userRole =>
+                         !desiredRoleIds.Contains(userRole.RoleId))
+                     .ToArray())
+        {
+            UserRoles.Remove(userRole);
+        }
+
+        foreach (var roleId in desiredRoleIds)
+        {
+            AssignRole(roleId, assignedAtUtc);
+        }
+    }
+
     private static string RequireText(string value, string parameterName)
     {
         if (string.IsNullOrWhiteSpace(value))

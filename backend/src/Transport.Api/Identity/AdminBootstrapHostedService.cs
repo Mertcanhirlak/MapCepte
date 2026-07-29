@@ -6,6 +6,7 @@ namespace Transport.Api.Identity;
 public sealed partial class AdminBootstrapHostedService(
     IServiceScopeFactory scopeFactory,
     IOptions<BootstrapAdminOptions> options,
+    IOptions<IdentitySecurityOptions> securityOptions,
     IHostEnvironment environment,
     ILogger<AdminBootstrapHostedService> logger)
     : IHostedService
@@ -27,7 +28,7 @@ public sealed partial class AdminBootstrapHostedService(
                 options.Value.DisplayName,
                 options.Value.Password,
                 AllowWeakPassword:
-                    options.Value.AllowWeakPasswordInDevelopment
+                    securityOptions.Value.AllowWeakPasswordsInDevelopment
                     && environment.IsDevelopment()),
             cancellationToken);
 

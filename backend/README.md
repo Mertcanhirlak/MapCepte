@@ -82,7 +82,7 @@ Remove-Item Env:BootstrapAdmin__Password
 Remove-Variable securePassword
 ```
 
-Production parolası 12-128 karakter olmalı; büyük harf, küçük harf, rakam ve sembol içermelidir. `appsettings.Development.json` yerel geliştirmede en az 6 karakterlik basit bootstrap parolasına açıkça izin verir; bu override production ortamında çalışmaz. İkinci çalıştırma yeni bir Admin oluşturmaz. Normal API başlangıcında `BootstrapAdmin__Enabled` kapalı kalmalıdır.
+Production parolası 12-128 karakter olmalı; büyük harf, küçük harf, rakam ve sembol içermelidir. `appsettings.Development.json` içindeki `IdentitySecurity:AllowWeakPasswordsInDevelopment` yerel geliştirmede en az 6 karakterlik basit parolaya açıkça izin verir; bu override production ortamında çalışmaz. İkinci çalıştırma yeni bir Admin oluşturmaz. Normal API başlangıcında `BootstrapAdmin__Enabled` kapalı kalmalıdır.
 
 ## Oturum API'si
 
@@ -104,6 +104,14 @@ Endpoint'ler yalnızca role adına göre değil, oturum cookie'sindeki permissio
 - Oturumu olmayan çağrı `401 Unauthorized` döndürür.
 - Oturumu bulunan fakat permission'ı olmayan kullanıcı `403 Forbidden` alır.
 - Permission'a sahip Admin rol ve permission kataloğunu okuyabilir.
+
+Admin kullanıcı yönetimi:
+
+- `GET /api/admin/users`, `users.read` ister.
+- `POST /api/admin/users`, `users.manage` ve `roles.manage` ister.
+- `PUT /api/admin/users/{userId}/roles`, `users.manage` ve `roles.manage` ister.
+- Kullanıcı oluşturma ve rol değiştirme istekleri CSRF token gerektirir.
+- Yönetici kendi rollerini bu endpoint üzerinden değiştiremez.
 
 Yeni bir endpoint'e koruma eklemek için endpoint tanımında `RequirePermission(PermissionNames.<Permission>)` kullanılır.
 
