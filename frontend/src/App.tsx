@@ -22,6 +22,7 @@ import {
   type LayerVisibility,
   type OperationalLayerId,
 } from './features/map/mapLayers'
+import { StopManagementPage } from './features/stops/StopManagementPage'
 import { API_BASE_URL, useApiStatus } from './shared/useApiStatus'
 
 const TransportMap = lazy(async () => {
@@ -73,6 +74,9 @@ function AuthenticatedLayout() {
 
       <nav className="primary-nav" aria-label="Ana menü">
         <NavLink end to="/">Operasyon haritası</NavLink>
+        {hasPermission('stops.read') && (
+          <NavLink to="/stops">Duraklar</NavLink>
+        )}
         {hasPermission('roles.read') && (
           <NavLink to="/admin/roles">Rol yönetimi</NavLink>
         )}
@@ -174,6 +178,14 @@ function App() {
       <Route element={<ProtectedRoute />}>
         <Route element={<AuthenticatedLayout />}>
           <Route index element={<MapPage />} />
+          <Route
+            path="/stops"
+            element={
+              <PermissionRoute permission="stops.read" redirectTo="/">
+                <StopManagementPage />
+              </PermissionRoute>
+            }
+          />
           <Route
             path="/admin/roles"
             element={

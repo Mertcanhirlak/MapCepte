@@ -8,8 +8,11 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using Transport.Api.Authorization;
 using Transport.Api.Identity;
+using Transport.Api.Stops;
 using Transport.Application.Identity;
+using Transport.Application.Stops;
 using Transport.Domain.Identity;
+using Transport.Domain.Stops;
 
 namespace Transport.IntegrationTests;
 
@@ -43,12 +46,14 @@ public sealed class AuthEndpointsTests
                 PermissionNames.RolesRead,
                 PermissionNames.RolesManage,
                 PermissionNames.AuditRead,
+                PermissionNames.StopsRead,
+                PermissionNames.StopsCreate,
             ]);
 
         var operatorAuthenticationData = new UserAuthenticationData(
             operatorUser,
             [SystemRoleNames.Operator],
-            [PermissionNames.StopsRead]);
+            [PermissionNames.StopsRead, PermissionNames.StopsCreate]);
 
         var roles = new RoleCatalogItem[]
         {
@@ -83,6 +88,7 @@ public sealed class AuthEndpointsTests
                     services.RemoveAll<IIdentityRepository>();
                     services.RemoveAll<IPasswordHashService>();
                     services.RemoveAll<IAuditStore>();
+                    services.RemoveAll<IStopRepository>();
                     services.AddSingleton<IIdentityRepository>(
                         new FakeIdentityRepository(
                             [
@@ -94,6 +100,8 @@ public sealed class AuthEndpointsTests
                         new AcceptingPasswordHashService());
                     services.AddSingleton<IAuditStore>(
                         new FakeAuditStore());
+                    services.AddSingleton<IStopRepository>(
+                        new FakeStopRepository());
                 });
             })
             .CreateClient();
@@ -117,6 +125,10 @@ public sealed class AuthEndpointsTests
         Assert.Equal(
             HttpStatusCode.Unauthorized,
             anonymousAudit.StatusCode);
+        var anonymousStops = await _client.GetAsync("/api/stops");
+        Assert.Equal(
+            HttpStatusCode.Unauthorized,
+            anonymousStops.StatusCode);
 
         var csrfResponse = await _client.GetAsync("/api/auth/csrf");
         var csrfBody = await csrfResponse.Content.ReadAsStringAsync();
@@ -280,6 +292,35 @@ public sealed class AuthEndpointsTests
     }
 
     [Fact]
+    public async Task AdminCanCreateAndListStops()
+    {
+        await LoginAsync("admin@example.com");
+        await RefreshCsrfAsync();
+
+        var create = await _client.PostAsJsonAsync(
+            "/api/stops",
+            new CreateStopRequest(
+                "Merkez Meydan",
+                "MRK-001",
+                "Ana meydan durağı",
+                "#13B8A6",
+                32.8597,
+                39.9334));
+
+        Assert.Equal(HttpStatusCode.Created, create.StatusCode);
+        var created = await create.Content.ReadFromJsonAsync<StopResponse>();
+        Assert.NotNull(created);
+        Assert.Equal("Draft", created.Status);
+        Assert.Equal(32.8597, created.Longitude);
+        Assert.Equal(39.9334, created.Latitude);
+
+        var stops = await _client.GetFromJsonAsync<StopResponse[]>(
+            "/api/stops");
+        Assert.NotNull(stops);
+        Assert.Contains(stops, stop => stop.Id == created.Id);
+    }
+
+    [Fact]
     public async Task LoginWithoutCsrfTokenIsRejected()
     {
         var response = await _client.PostAsJsonAsync(
@@ -364,6 +405,53 @@ public sealed class AuthEndpointsTests
                     entry.IpAddress))
                 .ToArray();
             return Task.FromResult(result);
+        }
+    }
+
+    private sealed class FakeStopRepository : IStopRepository
+    {
+        private readonly List<Stop> stops = [];
+
+        public Task<IReadOnlyCollection<Stop>> ListAsync(
+            Guid actorUserId,
+            StopVisibilityScope scope,
+            CancellationToken cancellationToken)
+        {
+            IReadOnlyCollection<Stop> result = scope switch
+            {
+                StopVisibilityScope.All => stops.ToArray(),
+                StopVisibilityScope.Owned => stops
+                    .Where(stopEntity =>
+                        stopEntity.CreatedByUserId == actorUserId)
+                    .ToArray(),
+                StopVisibilityScope.Published => stops
+                    .Where(stopEntity =>
+                        stopEntity.Status == StopStatus.Published)
+                    .ToArray(),
+                _ => [],
+            };
+            return Task.FromResult(result);
+        }
+
+        public Task<bool> CodeExistsAsync(
+            string normalizedCode,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult(stops.Any(stopEntity =>
+                stopEntity.NormalizedCode == normalizedCode));
+        }
+
+        public Task AddAsync(
+            Stop stopEntity,
+            CancellationToken cancellationToken)
+        {
+            stops.Add(stopEntity);
+            return Task.CompletedTask;
+        }
+
+        public Task SaveChangesAsync(CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
         }
     }
 

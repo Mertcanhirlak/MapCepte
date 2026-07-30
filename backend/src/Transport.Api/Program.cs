@@ -6,6 +6,7 @@ using Transport.Api.Authorization;
 using Transport.Api.Contracts;
 using Transport.Api.Health;
 using Transport.Api.Identity;
+using Transport.Api.Stops;
 using Transport.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -110,6 +111,7 @@ app.UseAntiforgery();
 
 app.MapAuthEndpoints();
 app.MapAdminEndpoints();
+app.MapStopEndpoints();
 
 app.MapGet(
         "/api/system",
@@ -117,7 +119,7 @@ app.MapGet(
             new SystemInfoResponse(
                 Name: "MapCepte Transport API",
                 Runtime: ".NET 10",
-                Phase: "IdentityAuthorization")))
+                Phase: "StopManagement")))
     .WithName("GetSystemInfo")
     .WithTags("System");
 

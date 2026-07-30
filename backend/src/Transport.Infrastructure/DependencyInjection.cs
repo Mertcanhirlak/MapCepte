@@ -4,9 +4,11 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Transport.Application.Identity;
+using Transport.Application.Stops;
 using Transport.Domain.Identity;
 using Transport.Infrastructure.Identity;
 using Transport.Infrastructure.Persistence;
+using Transport.Infrastructure.Stops;
 
 namespace Transport.Infrastructure;
 
@@ -35,6 +37,8 @@ public static class DependencyInjection
         services.AddScoped<RoleCatalogService>();
         services.AddScoped<UserManagementService>();
         services.AddScoped<AuditCatalogService>();
+        services.AddScoped<IStopRepository, EfStopRepository>();
+        services.AddScoped<StopManagementService>();
         var maximumFailedAttempts = configuration.GetValue<int?>(
                 "IdentitySecurity:MaximumFailedLoginAttempts")
             ?? 5;

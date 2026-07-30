@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Transport.Domain.Identity;
+using Transport.Domain.Stops;
 using Transport.Infrastructure.Persistence.Seeding;
 
 namespace Transport.Infrastructure.Persistence;
@@ -18,6 +19,8 @@ public sealed class TransportDbContext(DbContextOptions<TransportDbContext> opti
     public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
 
     public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
+
+    public DbSet<Stop> Stops => Set<Stop>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
