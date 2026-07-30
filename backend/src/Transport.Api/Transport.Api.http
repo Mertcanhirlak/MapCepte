@@ -30,6 +30,26 @@ Accept: application/json
 
 ###
 
+GET {{Transport.Api_HostAddress}}/api/stops
+Accept: application/json
+
+###
+
+POST {{Transport.Api_HostAddress}}/api/stops
+Content-Type: application/json
+X-CSRF-TOKEN: {{CsrfToken}}
+
+{
+  "name": "Merkez Meydan",
+  "code": "MRK-001",
+  "description": "Ana meydan durağı",
+  "color": "#13B8A6",
+  "longitude": 32.8597,
+  "latitude": 39.9334
+}
+
+###
+
 POST {{Transport.Api_HostAddress}}/api/admin/users
 Content-Type: application/json
 X-CSRF-TOKEN: {{CsrfToken}}
