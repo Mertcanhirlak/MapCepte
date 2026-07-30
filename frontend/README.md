@@ -28,7 +28,9 @@ Development ortamında `VITE_API_BASE_URL` boş bırakılır; Vite `/api` ve `/h
 - Uygulama açılırken `/api/auth/me` çağrılır. Oturumu olmayan kullanıcı korumalı sayfalardan `/login` sayfasına yönlendirilir.
 - `roles.read` permission'ına sahip kullanıcı `/admin/roles` menüsünü ve salt okunur rol kataloğunu görebilir.
 - `users.read` ve `roles.read` permission'larına sahip kullanıcı `/admin/users` sayfasını görebilir; `users.manage` ile `roles.manage` birlikte varsa kullanıcı oluşturabilir ve başka kullanıcıların rollerini değiştirebilir.
+- `audit.read` permission'ına sahip kullanıcı `/admin/audit` sayfasında son 100 güvenlik olayını görebilir.
 - Yönetici kendi rollerini arayüzden değiştiremez; backend aynı kuralı ayrıca zorunlu tutar.
+- Bir kullanıcı önceki oturumdan kalan yetkisiz bir Admin adresine girerse ana sayfaya yönlendirilir; böylece standart `User` rolü boş bir yetki ekranında kalmaz.
 - Arayüzde menü gizleme güvenlik sınırı değildir; backend endpoint'i aynı permission'ı ayrıca zorunlu tutar.
 
 ## Kontroller

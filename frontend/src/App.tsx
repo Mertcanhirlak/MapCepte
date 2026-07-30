@@ -8,6 +8,7 @@ import {
 } from 'react-router-dom'
 import './App.css'
 import { AdminRolesPage } from './features/admin/AdminRolesPage'
+import { AdminAuditPage } from './features/admin/AdminAuditPage'
 import { AdminUsersPage } from './features/admin/AdminUsersPage'
 import { useAuth } from './features/auth/authState'
 import { LoginPage } from './features/auth/LoginPage'
@@ -77,6 +78,9 @@ function AuthenticatedLayout() {
         )}
         {hasPermission('users.read') && hasPermission('roles.read') && (
           <NavLink to="/admin/users">Kullanıcı yönetimi</NavLink>
+        )}
+        {hasPermission('audit.read') && (
+          <NavLink to="/admin/audit">Audit kayıtları</NavLink>
         )}
       </nav>
 
@@ -173,7 +177,7 @@ function App() {
           <Route
             path="/admin/roles"
             element={
-              <PermissionRoute permission="roles.read">
+              <PermissionRoute permission="roles.read" redirectTo="/">
                 <AdminRolesPage />
               </PermissionRoute>
             }
@@ -181,10 +185,18 @@ function App() {
           <Route
             path="/admin/users"
             element={
-              <PermissionRoute permission="users.read">
-                <PermissionRoute permission="roles.read">
+              <PermissionRoute permission="users.read" redirectTo="/">
+                <PermissionRoute permission="roles.read" redirectTo="/">
                   <AdminUsersPage />
                 </PermissionRoute>
+              </PermissionRoute>
+            }
+          />
+          <Route
+            path="/admin/audit"
+            element={
+              <PermissionRoute permission="audit.read" redirectTo="/">
+                <AdminAuditPage />
               </PermissionRoute>
             }
           />

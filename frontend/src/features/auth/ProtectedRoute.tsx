@@ -24,13 +24,19 @@ export function ProtectedRoute() {
 export function PermissionRoute({
   permission,
   children,
+  redirectTo,
 }: {
   permission: string
   children: ReactNode
+  redirectTo?: string
 }) {
   const { hasPermission } = useAuth()
 
   if (!hasPermission(permission)) {
+    if (redirectTo) {
+      return <Navigate to={redirectTo} replace />
+    }
+
     return (
       <main className="access-denied">
         <p className="eyebrow">Yetki gerekli</p>
