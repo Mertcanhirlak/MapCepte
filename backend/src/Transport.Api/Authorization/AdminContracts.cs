@@ -23,3 +23,12 @@ public sealed record CreateUserRequest(
 
 public sealed record UpdateUserRolesRequest(
     IReadOnlyCollection<string> Roles);
+
+public sealed record AuditCatalogResponse(
+    Guid Id,
+    string EventType,
+    string Outcome,
+    DateTimeOffset OccurredAtUtc,
+    Guid? ActorUserId,
+    Guid? SubjectUserId,
+    string? IpAddress);

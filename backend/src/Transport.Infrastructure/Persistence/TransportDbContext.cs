@@ -17,6 +17,8 @@ public sealed class TransportDbContext(DbContextOptions<TransportDbContext> opti
 
     public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
 
+    public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasPostgresExtension("postgis");

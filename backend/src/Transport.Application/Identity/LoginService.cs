@@ -1,8 +1,13 @@
+using Transport.Domain.Identity;
+
 namespace Transport.Application.Identity;
 
 public sealed class LoginService(
     IIdentityRepository identityRepository,
-    IPasswordHashService passwordHashService)
+    IPasswordHashService passwordHashService,
+    IAuditStore auditStore,
+    LoginSecurityPolicy securityPolicy,
+    TimeProvider timeProvider)
 {
     public async Task<LoginResult> LoginAsync(
         LoginCommand command,
@@ -17,6 +22,11 @@ public sealed class LoginService(
         {
             passwordHashService.PerformDummyVerification(
                 command.Password ?? string.Empty);
+            await RecordAndSaveAsync(
+                AuditOutcomes.Failed,
+                subjectUserId: null,
+                command.IpAddress,
+                cancellationToken);
             return InvalidCredentials();
         }
 
@@ -28,37 +38,103 @@ public sealed class LoginService(
         if (authenticationData is null)
         {
             passwordHashService.PerformDummyVerification(command.Password);
+            await RecordAndSaveAsync(
+                AuditOutcomes.Failed,
+                subjectUserId: null,
+                command.IpAddress,
+                cancellationToken);
             return InvalidCredentials();
         }
 
+        var user = authenticationData.User;
+        var now = timeProvider.GetUtcNow();
+
+        if (user.IsLockedOut(now))
+        {
+            await RecordAndSaveAsync(
+                AuditOutcomes.LockedOut,
+                user.Id,
+                command.IpAddress,
+                cancellationToken);
+            return new LoginResult(LoginStatus.LockedOut, User: null);
+        }
+
         var verification = passwordHashService.VerifyPassword(
-            authenticationData.User,
-            authenticationData.User.PasswordHash,
+            user,
+            user.PasswordHash,
             command.Password);
 
         if (verification == PasswordVerificationOutcome.Failed
-            || !authenticationData.User.IsActive)
+            || !user.IsActive)
         {
-            return InvalidCredentials();
+            var outcome = AuditOutcomes.Failed;
+
+            if (user.IsActive)
+            {
+                user.RegisterFailedLogin(
+                    now,
+                    securityPolicy.MaximumFailedAttempts,
+                    securityPolicy.LockoutDuration);
+
+                if (user.IsLockedOut(now))
+                {
+                    outcome = AuditOutcomes.LockedOut;
+                }
+            }
+
+            await RecordAndSaveAsync(
+                outcome,
+                user.Id,
+                command.IpAddress,
+                cancellationToken);
+
+            return new LoginResult(
+                outcome == AuditOutcomes.LockedOut
+                    ? LoginStatus.LockedOut
+                    : LoginStatus.InvalidCredentials,
+                User: null);
         }
 
         if (verification == PasswordVerificationOutcome.SuccessRehashNeeded)
         {
-            authenticationData.User.ChangePasswordHash(
-                passwordHashService.HashPassword(
-                    authenticationData.User,
-                    command.Password));
-            await identityRepository.SaveChangesAsync(cancellationToken);
+            user.ChangePasswordHash(
+                passwordHashService.HashPassword(user, command.Password));
         }
+
+        user.RegisterSuccessfulLogin();
+        await RecordAndSaveAsync(
+            AuditOutcomes.Succeeded,
+            user.Id,
+            command.IpAddress,
+            cancellationToken);
 
         return new LoginResult(
             LoginStatus.Success,
             new AuthenticatedUser(
-                authenticationData.User.Id,
-                authenticationData.User.Email,
-                authenticationData.User.DisplayName,
+                user.Id,
+                user.Email,
+                user.DisplayName,
                 authenticationData.Roles,
                 authenticationData.Permissions));
+    }
+
+    private async Task RecordAndSaveAsync(
+        string outcome,
+        Guid? subjectUserId,
+        string? ipAddress,
+        CancellationToken cancellationToken)
+    {
+        await auditStore.AddAsync(
+            new AuditEntry(
+                Guid.NewGuid(),
+                AuditEventNames.Login,
+                outcome,
+                timeProvider.GetUtcNow(),
+                actorUserId: subjectUserId,
+                subjectUserId,
+                ipAddress),
+            cancellationToken);
+        await identityRepository.SaveChangesAsync(cancellationToken);
     }
 
     private static LoginResult InvalidCredentials()

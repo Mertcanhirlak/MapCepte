@@ -4,6 +4,7 @@ public enum LoginStatus
 {
     Success = 0,
     InvalidCredentials = 1,
+    LockedOut = 2,
 }
 
 public sealed record AuthenticatedUser(

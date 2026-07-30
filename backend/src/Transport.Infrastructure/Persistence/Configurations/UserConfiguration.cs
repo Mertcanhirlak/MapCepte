@@ -46,5 +46,14 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
             .HasColumnName("created_at_utc")
             .HasColumnType("timestamp with time zone")
             .IsRequired();
+
+        builder.Property(user => user.FailedLoginAttemptCount)
+            .HasColumnName("failed_login_attempt_count")
+            .HasDefaultValue(0)
+            .IsRequired();
+
+        builder.Property(user => user.LockoutEndUtc)
+            .HasColumnName("lockout_end_utc")
+            .HasColumnType("timestamp with time zone");
     }
 }

@@ -25,6 +25,11 @@ Accept: application/json
 
 ###
 
+GET {{Transport.Api_HostAddress}}/api/admin/audit
+Accept: application/json
+
+###
+
 POST {{Transport.Api_HostAddress}}/api/admin/users
 Content-Type: application/json
 X-CSRF-TOKEN: {{CsrfToken}}

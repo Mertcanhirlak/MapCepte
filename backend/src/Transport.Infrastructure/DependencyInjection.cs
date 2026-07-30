@@ -29,10 +29,29 @@ public static class DependencyInjection
         services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();
         services.AddScoped<IPasswordHashService, AspNetPasswordHashService>();
         services.AddScoped<IIdentityRepository, EfIdentityRepository>();
+        services.AddScoped<IAuditStore, EfAuditStore>();
         services.AddScoped<AdminBootstrapService>();
         services.AddScoped<LoginService>();
         services.AddScoped<RoleCatalogService>();
         services.AddScoped<UserManagementService>();
+        services.AddScoped<AuditCatalogService>();
+        var maximumFailedAttempts = configuration.GetValue<int?>(
+                "IdentitySecurity:MaximumFailedLoginAttempts")
+            ?? 5;
+        var lockoutMinutes = configuration.GetValue<int?>(
+                "IdentitySecurity:LockoutMinutes")
+            ?? 15;
+
+        if (maximumFailedAttempts <= 0 || lockoutMinutes <= 0)
+        {
+            throw new InvalidOperationException(
+                "Identity lockout settings must be positive.");
+        }
+
+        services.AddSingleton(
+            new LoginSecurityPolicy(
+                maximumFailedAttempts,
+                TimeSpan.FromMinutes(lockoutMinutes)));
         services.TryAddSingleton(TimeProvider.System);
 
         return services;

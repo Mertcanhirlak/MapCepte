@@ -48,10 +48,33 @@ public static class AdminEndpoints
                 })
             .RequirePermission(PermissionNames.UsersRead);
 
+        group.MapGet(
+                "/audit",
+                async (
+                    AuditCatalogService auditCatalogService,
+                    CancellationToken cancellationToken) =>
+                {
+                    var entries =
+                        await auditCatalogService.ListRecentAsync(
+                            cancellationToken);
+
+                    return TypedResults.Ok(
+                        entries.Select(entry => new AuditCatalogResponse(
+                            entry.Id,
+                            entry.EventType,
+                            entry.Outcome,
+                            entry.OccurredAtUtc,
+                            entry.ActorUserId,
+                            entry.SubjectUserId,
+                            entry.IpAddress)));
+                })
+            .RequirePermission(PermissionNames.AuditRead);
+
         group.MapPost(
                 "/users",
                 async (
                     CreateUserRequest request,
+                    ClaimsPrincipal principal,
                     UserManagementService userManagementService,
                     IOptions<IdentitySecurityOptions> securityOptions,
                     IHostEnvironment environment,
@@ -64,6 +87,11 @@ public static class AdminEndpoints
                         return Results.BadRequest();
                     }
 
+                    if (!TryGetUserId(principal, out var actorUserId))
+                    {
+                        return Results.Unauthorized();
+                    }
+
                     var result = await userManagementService.CreateAsync(
                         new CreateUserCommand(
                             request.Email,
@@ -73,7 +101,8 @@ public static class AdminEndpoints
                             AllowWeakPassword:
                                 environment.IsDevelopment()
                                 && securityOptions.Value
-                                    .AllowWeakPasswordsInDevelopment),
+                                    .AllowWeakPasswordsInDevelopment,
+                            ActorUserId: actorUserId),
                         cancellationToken);
 
                     return ToHttpResult(result, created: true);
@@ -97,10 +126,7 @@ public static class AdminEndpoints
                         return Results.BadRequest();
                     }
 
-                    if (!Guid.TryParse(
-                            principal.FindFirstValue(
-                                ClaimTypes.NameIdentifier),
-                            out var actorUserId))
+                    if (!TryGetUserId(principal, out var actorUserId))
                     {
                         return Results.Unauthorized();
                     }
@@ -164,5 +190,14 @@ public static class AdminEndpoints
             user.IsActive,
             user.CreatedAtUtc,
             user.Roles);
+    }
+
+    private static bool TryGetUserId(
+        ClaimsPrincipal principal,
+        out Guid userId)
+    {
+        return Guid.TryParse(
+            principal.FindFirstValue(ClaimTypes.NameIdentifier),
+            out userId);
     }
 }

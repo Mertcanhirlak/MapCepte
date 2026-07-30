@@ -40,7 +40,10 @@ public static class AuthEndpoints
                     }
 
                     var result = await loginService.LoginAsync(
-                        new LoginCommand(request.Email, request.Password),
+                        new LoginCommand(
+                            request.Email,
+                            request.Password,
+                            httpContext.Connection.RemoteIpAddress?.ToString()),
                         cancellationToken);
 
                     if (result.Status != LoginStatus.Success

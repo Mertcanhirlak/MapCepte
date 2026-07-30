@@ -5,7 +5,8 @@ public sealed record CreateUserCommand(
     string DisplayName,
     string Password,
     IReadOnlyCollection<string> Roles,
-    bool AllowWeakPassword = false);
+    bool AllowWeakPassword = false,
+    Guid ActorUserId = default);
 
 public sealed record UpdateUserRolesCommand(
     Guid ActorUserId,

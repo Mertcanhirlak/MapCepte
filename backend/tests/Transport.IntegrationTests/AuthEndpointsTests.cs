@@ -42,6 +42,7 @@ public sealed class AuthEndpointsTests
                 PermissionNames.UsersManage,
                 PermissionNames.RolesRead,
                 PermissionNames.RolesManage,
+                PermissionNames.AuditRead,
             ]);
 
         var operatorAuthenticationData = new UserAuthenticationData(
@@ -81,6 +82,7 @@ public sealed class AuthEndpointsTests
                         .UseEphemeralDataProtectionProvider();
                     services.RemoveAll<IIdentityRepository>();
                     services.RemoveAll<IPasswordHashService>();
+                    services.RemoveAll<IAuditStore>();
                     services.AddSingleton<IIdentityRepository>(
                         new FakeIdentityRepository(
                             [
@@ -90,6 +92,8 @@ public sealed class AuthEndpointsTests
                             roles));
                     services.AddSingleton<IPasswordHashService>(
                         new AcceptingPasswordHashService());
+                    services.AddSingleton<IAuditStore>(
+                        new FakeAuditStore());
                 });
             })
             .CreateClient();
@@ -109,6 +113,10 @@ public sealed class AuthEndpointsTests
         Assert.Equal(
             HttpStatusCode.Unauthorized,
             anonymousUsers.StatusCode);
+        var anonymousAudit = await _client.GetAsync("/api/admin/audit");
+        Assert.Equal(
+            HttpStatusCode.Unauthorized,
+            anonymousAudit.StatusCode);
 
         var csrfResponse = await _client.GetAsync("/api/auth/csrf");
         var csrfBody = await csrfResponse.Content.ReadAsStringAsync();
@@ -147,6 +155,15 @@ public sealed class AuthEndpointsTests
         Assert.Contains(
             roles,
             role => role.Name == SystemRoleNames.Admin);
+        var auditEntries =
+            await _client.GetFromJsonAsync<AuditCatalogResponse[]>(
+                "/api/admin/audit");
+        Assert.NotNull(auditEntries);
+        Assert.Contains(
+            auditEntries,
+            entry =>
+                entry.EventType == AuditEventNames.Login
+                && entry.Outcome == AuditOutcomes.Succeeded);
 
         var authenticatedCsrf =
             await _client.GetFromJsonAsync<CsrfTokenResponse>(
@@ -176,6 +193,8 @@ public sealed class AuthEndpointsTests
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
         var usersResponse = await _client.GetAsync("/api/admin/users");
         Assert.Equal(HttpStatusCode.Forbidden, usersResponse.StatusCode);
+        var auditResponse = await _client.GetAsync("/api/admin/audit");
+        Assert.Equal(HttpStatusCode.Forbidden, auditResponse.StatusCode);
     }
 
     [Fact]
@@ -213,6 +232,17 @@ public sealed class AuthEndpointsTests
             await update.Content.ReadFromJsonAsync<UserCatalogResponse>();
         Assert.NotNull(updated);
         Assert.Equal([SystemRoleNames.User], updated.Roles);
+
+        var auditEntries =
+            await _client.GetFromJsonAsync<AuditCatalogResponse[]>(
+                "/api/admin/audit");
+        Assert.NotNull(auditEntries);
+        Assert.Contains(
+            auditEntries,
+            entry => entry.EventType == AuditEventNames.UserCreated);
+        Assert.Contains(
+            auditEntries,
+            entry => entry.EventType == AuditEventNames.UserRolesUpdated);
     }
 
     [Fact]
@@ -302,6 +332,38 @@ public sealed class AuthEndpointsTests
 
         public void PerformDummyVerification(string providedPassword)
         {
+        }
+    }
+
+    private sealed class FakeAuditStore : IAuditStore
+    {
+        private readonly List<AuditEntry> entries = [];
+
+        public Task AddAsync(
+            AuditEntry auditEntry,
+            CancellationToken cancellationToken)
+        {
+            entries.Add(auditEntry);
+            return Task.CompletedTask;
+        }
+
+        public Task<IReadOnlyCollection<AuditCatalogItem>> ListRecentAsync(
+            int maximumCount,
+            CancellationToken cancellationToken)
+        {
+            IReadOnlyCollection<AuditCatalogItem> result = entries
+                .OrderByDescending(entry => entry.OccurredAtUtc)
+                .Take(maximumCount)
+                .Select(entry => new AuditCatalogItem(
+                    entry.Id,
+                    entry.EventType,
+                    entry.Outcome,
+                    entry.OccurredAtUtc,
+                    entry.ActorUserId,
+                    entry.SubjectUserId,
+                    entry.IpAddress))
+                .ToArray();
+            return Task.FromResult(result);
         }
     }
 

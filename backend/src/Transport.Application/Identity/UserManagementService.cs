@@ -6,6 +6,7 @@ namespace Transport.Application.Identity;
 public sealed class UserManagementService(
     IIdentityRepository identityRepository,
     IPasswordHashService passwordHashService,
+    IAuditStore auditStore,
     TimeProvider timeProvider)
 {
     public Task<IReadOnlyCollection<UserCatalogItem>> ListAsync(
@@ -67,6 +68,17 @@ public sealed class UserManagementService(
         }
 
         await identityRepository.AddUserAsync(user, cancellationToken);
+        await auditStore.AddAsync(
+            new AuditEntry(
+                Guid.NewGuid(),
+                AuditEventNames.UserCreated,
+                AuditOutcomes.Succeeded,
+                now,
+                actorUserId: command.ActorUserId == Guid.Empty
+                    ? null
+                    : command.ActorUserId,
+                subjectUserId: user.Id),
+            cancellationToken);
         await identityRepository.SaveChangesAsync(cancellationToken);
 
         return Success(user, roles);
@@ -122,6 +134,15 @@ public sealed class UserManagementService(
         user.ReplaceRoles(
             roles.Select(role => role.Id),
             timeProvider.GetUtcNow());
+        await auditStore.AddAsync(
+            new AuditEntry(
+                Guid.NewGuid(),
+                AuditEventNames.UserRolesUpdated,
+                AuditOutcomes.Succeeded,
+                timeProvider.GetUtcNow(),
+                actorUserId: command.ActorUserId,
+                subjectUserId: user.Id),
+            cancellationToken);
         await identityRepository.SaveChangesAsync(cancellationToken);
 
         return Success(user, roles);

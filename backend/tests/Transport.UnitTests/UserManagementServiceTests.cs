@@ -12,14 +12,18 @@ public sealed class UserManagementServiceTests
     public async Task CreatesUserWithHashedPasswordAndSelectedRoles()
     {
         var repository = new FakeIdentityRepository();
-        var service = CreateService(repository);
+        var auditStore = new FakeAuditStore();
+        var actorUserId =
+            Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+        var service = CreateService(repository, auditStore);
 
         var result = await service.CreateAsync(
             new CreateUserCommand(
                 "operator@example.com",
                 "Example Operator",
                 "Strong-Password-2026!",
-                [SystemRoleNames.Operator, SystemRoleNames.User]));
+                [SystemRoleNames.Operator, SystemRoleNames.User],
+                ActorUserId: actorUserId));
 
         Assert.Equal(UserManagementStatus.Success, result.Status);
         Assert.NotNull(repository.AddedUser);
@@ -32,6 +36,10 @@ public sealed class UserManagementServiceTests
         Assert.Contains(
             repository.UserRole.Id,
             repository.AddedUser.UserRoles.Select(role => role.RoleId));
+        var auditEntry = Assert.Single(auditStore.Entries);
+        Assert.Equal(AuditEventNames.UserCreated, auditEntry.EventType);
+        Assert.Equal(actorUserId, auditEntry.ActorUserId);
+        Assert.Equal(repository.AddedUser.Id, auditEntry.SubjectUserId);
         Assert.Equal(1, repository.SaveCount);
     }
 
@@ -136,11 +144,13 @@ public sealed class UserManagementServiceTests
     }
 
     private static UserManagementService CreateService(
-        FakeIdentityRepository repository)
+        FakeIdentityRepository repository,
+        FakeAuditStore? auditStore = null)
     {
         return new UserManagementService(
             repository,
             new FakePasswordHashService(),
+            auditStore ?? new FakeAuditStore(),
             new FixedTimeProvider(FixedNow));
     }
 
@@ -266,6 +276,26 @@ public sealed class UserManagementServiceTests
 
         public void PerformDummyVerification(string providedPassword)
         {
+        }
+    }
+
+    private sealed class FakeAuditStore : IAuditStore
+    {
+        public List<AuditEntry> Entries { get; } = [];
+
+        public Task AddAsync(
+            AuditEntry auditEntry,
+            CancellationToken cancellationToken)
+        {
+            Entries.Add(auditEntry);
+            return Task.CompletedTask;
+        }
+
+        public Task<IReadOnlyCollection<AuditCatalogItem>> ListRecentAsync(
+            int maximumCount,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult<IReadOnlyCollection<AuditCatalogItem>>([]);
         }
     }
 

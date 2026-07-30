@@ -41,6 +41,10 @@ public sealed class User
 
     public DateTimeOffset CreatedAtUtc { get; private set; }
 
+    public int FailedLoginAttemptCount { get; private set; }
+
+    public DateTimeOffset? LockoutEndUtc { get; private set; }
+
     public ICollection<UserRole> UserRoles { get; } = [];
 
     public void Deactivate() => IsActive = false;
@@ -50,6 +54,42 @@ public sealed class User
     public void ChangePasswordHash(string passwordHash)
     {
         PasswordHash = RequireText(passwordHash, nameof(passwordHash));
+    }
+
+    public bool IsLockedOut(DateTimeOffset nowUtc)
+    {
+        return LockoutEndUtc > nowUtc.ToUniversalTime();
+    }
+
+    public void RegisterFailedLogin(
+        DateTimeOffset nowUtc,
+        int maximumAttempts,
+        TimeSpan lockoutDuration)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maximumAttempts);
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(
+            lockoutDuration,
+            TimeSpan.Zero);
+
+        var utcNow = nowUtc.ToUniversalTime();
+        if (LockoutEndUtc <= utcNow)
+        {
+            FailedLoginAttemptCount = 0;
+            LockoutEndUtc = null;
+        }
+
+        FailedLoginAttemptCount++;
+
+        if (FailedLoginAttemptCount >= maximumAttempts)
+        {
+            LockoutEndUtc = utcNow.Add(lockoutDuration);
+        }
+    }
+
+    public void RegisterSuccessfulLogin()
+    {
+        FailedLoginAttemptCount = 0;
+        LockoutEndUtc = null;
     }
 
     public void AssignRole(Guid roleId, DateTimeOffset assignedAtUtc)

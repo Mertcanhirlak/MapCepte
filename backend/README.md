@@ -94,7 +94,7 @@ Tarayıcı oturumu şifreli ve `HttpOnly` cookie ile korunur. JavaScript cookie 
 4. `GET /api/auth/me` mevcut kullanıcı, roller ve permission'ları döndürür.
 5. Güncel CSRF token ile `POST /api/auth/logout` oturumu kapatır.
 
-Oturum 15 dakika geçerlidir ve aktif kullanımda güvenli biçimde yenilenir. Login denemeleri IP başına dakikada beş istekle sınırlandırılmıştır. Üretimde cookie yalnızca HTTPS üzerinden gönderilir.
+Oturum 15 dakika geçerlidir ve aktif kullanımda güvenli biçimde yenilenir. Login denemeleri IP başına dakikada beş istekle sınırlandırılmıştır. Bir hesap art arda beş hatalı denemeden sonra 15 dakika kilitlenir; başarılı giriş sayacı sıfırlar. Üretimde cookie yalnızca HTTPS üzerinden gönderilir.
 
 ## Permission korumalı API
 
@@ -112,6 +112,9 @@ Admin kullanıcı yönetimi:
 - `PUT /api/admin/users/{userId}/roles`, `users.manage` ve `roles.manage` ister.
 - Kullanıcı oluşturma ve rol değiştirme istekleri CSRF token gerektirir.
 - Yönetici kendi rollerini bu endpoint üzerinden değiştiremez.
+- `GET /api/admin/audit`, `audit.read` ister ve son 100 güvenlik olayını döndürür.
+
+Başarılı/başarısız/kilitli girişler, kullanıcı oluşturma ve rol değişiklikleri audit tablosuna yazılır. Parola, cookie ve CSRF token gibi hassas değerler audit kaydına alınmaz.
 
 Yeni bir endpoint'e koruma eklemek için endpoint tanımında `RequirePermission(PermissionNames.<Permission>)` kullanılır.
 

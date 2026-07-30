@@ -5,6 +5,9 @@ namespace Transport.UnitTests;
 
 public sealed class LoginServiceTests
 {
+    private static readonly DateTimeOffset FixedNow =
+        new(2026, 7, 30, 8, 0, 0, TimeSpan.Zero);
+
     [Fact]
     public async Task ValidCredentialsReturnRolesAndPermissions()
     {
@@ -16,7 +19,7 @@ public sealed class LoginServiceTests
                 [PermissionNames.UsersManage]));
         var passwordService = new FakePasswordHashService(
             PasswordVerificationOutcome.Success);
-        var service = new LoginService(repository, passwordService);
+        var service = CreateService(repository, passwordService);
 
         var result = await service.LoginAsync(
             new LoginCommand(
@@ -37,7 +40,7 @@ public sealed class LoginServiceTests
         var repository = new FakeIdentityRepository(authenticationData: null);
         var passwordService = new FakePasswordHashService(
             PasswordVerificationOutcome.Success);
-        var service = new LoginService(repository, passwordService);
+        var service = CreateService(repository, passwordService);
 
         var result = await service.LoginAsync(
             new LoginCommand(
@@ -57,7 +60,7 @@ public sealed class LoginServiceTests
         user.Deactivate();
         var repository = new FakeIdentityRepository(
             new UserAuthenticationData(user, [], []));
-        var service = new LoginService(
+        var service = CreateService(
             repository,
             new FakePasswordHashService(
                 PasswordVerificationOutcome.Success));
@@ -78,7 +81,7 @@ public sealed class LoginServiceTests
             new UserAuthenticationData(user, [], []));
         var passwordService = new FakePasswordHashService(
             PasswordVerificationOutcome.SuccessRehashNeeded);
-        var service = new LoginService(repository, passwordService);
+        var service = CreateService(repository, passwordService);
 
         var result = await service.LoginAsync(
             new LoginCommand(
@@ -88,6 +91,84 @@ public sealed class LoginServiceTests
         Assert.Equal(LoginStatus.Success, result.Status);
         Assert.Equal("UPGRADED-HASH", user.PasswordHash);
         Assert.Equal(1, repository.SaveCount);
+    }
+
+    [Fact]
+    public async Task LocksUserAfterConfiguredFailedAttempts()
+    {
+        var user = CreateUser();
+        var repository = new FakeIdentityRepository(
+            new UserAuthenticationData(user, [], []));
+        var auditStore = new FakeAuditStore();
+        var service = CreateService(
+            repository,
+            new FakePasswordHashService(
+                PasswordVerificationOutcome.Failed),
+            auditStore,
+            new LoginSecurityPolicy(3, TimeSpan.FromMinutes(10)));
+
+        var first = await service.LoginAsync(
+            new LoginCommand("admin@example.com", "wrong", "127.0.0.1"));
+        var second = await service.LoginAsync(
+            new LoginCommand("admin@example.com", "wrong", "127.0.0.1"));
+        var third = await service.LoginAsync(
+            new LoginCommand("admin@example.com", "wrong", "127.0.0.1"));
+
+        Assert.Equal(LoginStatus.InvalidCredentials, first.Status);
+        Assert.Equal(LoginStatus.InvalidCredentials, second.Status);
+        Assert.Equal(LoginStatus.LockedOut, third.Status);
+        Assert.True(user.IsLockedOut(FixedNow));
+        Assert.Equal(3, user.FailedLoginAttemptCount);
+        Assert.Equal(
+            AuditOutcomes.LockedOut,
+            auditStore.Entries.Last().Outcome);
+        Assert.DoesNotContain(
+            auditStore.Entries,
+            entry => entry.EventType.Contains(
+                "password",
+                StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task SuccessfulLoginClearsPreviousFailedAttempts()
+    {
+        var user = CreateUser();
+        user.RegisterFailedLogin(
+            FixedNow,
+            maximumAttempts: 5,
+            lockoutDuration: TimeSpan.FromMinutes(15));
+        var repository = new FakeIdentityRepository(
+            new UserAuthenticationData(user, [], []));
+        var auditStore = new FakeAuditStore();
+        var service = CreateService(
+            repository,
+            new FakePasswordHashService(
+                PasswordVerificationOutcome.Success),
+            auditStore);
+
+        var result = await service.LoginAsync(
+            new LoginCommand("admin@example.com", "correct"));
+
+        Assert.Equal(LoginStatus.Success, result.Status);
+        Assert.Equal(0, user.FailedLoginAttemptCount);
+        Assert.Null(user.LockoutEndUtc);
+        Assert.Equal(
+            AuditOutcomes.Succeeded,
+            auditStore.Entries.Single().Outcome);
+    }
+
+    private static LoginService CreateService(
+        FakeIdentityRepository repository,
+        FakePasswordHashService passwordService,
+        FakeAuditStore? auditStore = null,
+        LoginSecurityPolicy? securityPolicy = null)
+    {
+        return new LoginService(
+            repository,
+            passwordService,
+            auditStore ?? new FakeAuditStore(),
+            securityPolicy ?? new LoginSecurityPolicy(),
+            new FixedTimeProvider(FixedNow));
     }
 
     private static User CreateUser()
@@ -194,5 +275,30 @@ public sealed class LoginServiceTests
             SaveCount++;
             return Task.CompletedTask;
         }
+    }
+
+    private sealed class FakeAuditStore : IAuditStore
+    {
+        public List<AuditEntry> Entries { get; } = [];
+
+        public Task AddAsync(
+            AuditEntry auditEntry,
+            CancellationToken cancellationToken)
+        {
+            Entries.Add(auditEntry);
+            return Task.CompletedTask;
+        }
+
+        public Task<IReadOnlyCollection<AuditCatalogItem>> ListRecentAsync(
+            int maximumCount,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult<IReadOnlyCollection<AuditCatalogItem>>([]);
+        }
+    }
+
+    private sealed class FixedTimeProvider(DateTimeOffset value) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => value;
     }
 }
