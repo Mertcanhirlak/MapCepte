@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Transport.Domain.Identity;
+using Transport.Domain.Stops;
 using Transport.Infrastructure.Persistence;
 
 namespace Transport.IntegrationTests;
@@ -59,6 +60,23 @@ public sealed class IdentityModelTests
         Assert.Equal(PermissionNames.All.Count, permissionSeeds.Count());
         Assert.Equal(33, rolePermissionSeeds.Count());
         Assert.Empty(userSeeds);
+    }
+
+    [Fact]
+    public void StopUsesGeographyPointAndSpatialIndex()
+    {
+        using var context = CreateContext();
+
+        var stopType = context.Model.FindEntityType(typeof(Stop));
+        var location = stopType?.FindProperty(nameof(Stop.Location));
+        var spatialIndex = stopType?.GetIndexes().Single(index =>
+            index.GetDatabaseName() == "ix_stops_location");
+
+        Assert.Equal("stops", stopType?.GetTableName());
+        Assert.Equal("geography (point, 4326)", location?.GetColumnType());
+        Assert.Equal(
+            "gist",
+            spatialIndex?.FindAnnotation("Npgsql:IndexMethod")?.Value);
     }
 
     private static TransportDbContext CreateContext()
