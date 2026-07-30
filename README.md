@@ -40,4 +40,4 @@ Frontend varsayılan olarak `http://localhost:5173` adresinde çalışır.
 
 ## Faz durumu
 
-Faz 0 proje temeli ile Faz 1 kimlik doğrulama ve yetkilendirme temeli tamamlanmıştır. React login ekranı, cookie/CSRF akışı, korumalı rotalar, kullanıcı oluşturma, çoklu rol atama, geçici hesap kilitleme ve audit ekranı hazırdır. Sıradaki dikey dilim Faz 2 durak yönetimidir.
+Faz 0 proje temeli ile Faz 1 kimlik doğrulama ve yetkilendirme temeli tamamlanmıştır. Faz 2'nin ilk diliminde PostGIS tabanlı durak şeması, sahiplik filtreli listeleme, permission korumalı oluşturma API'si ve React durak ekranı eklenmiştir. Sıradaki dilim durak güncelleme/arşivleme işlemleri ve haritadan koordinat seçimidir.

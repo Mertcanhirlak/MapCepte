@@ -1,0 +1,243 @@
+import { useEffect, useState, type FormEvent } from 'react'
+import { useAuth } from '../auth/authState'
+import { ApiError, apiRequest, csrfRequest } from '../auth/authApi'
+
+export type StopCatalogItem = {
+  id: string
+  name: string
+  code: string | null
+  description: string | null
+  color: string
+  longitude: number
+  latitude: number
+  status: string
+  createdByUserId: string
+  createdAtUtc: string
+}
+
+function requestErrorMessage(error: unknown) {
+  return error instanceof ApiError
+    ? error.message
+    : 'Durak servisine bağlanılamadı.'
+}
+
+export function StopManagementPage() {
+  const { hasPermission } = useAuth()
+  const [stops, setStops] = useState<StopCatalogItem[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [isCreating, setIsCreating] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [message, setMessage] = useState<string | null>(null)
+  const [name, setName] = useState('')
+  const [code, setCode] = useState('')
+  const [description, setDescription] = useState('')
+  const [color, setColor] = useState('#13B8A6')
+  const [longitude, setLongitude] = useState('')
+  const [latitude, setLatitude] = useState('')
+  const canCreate = hasPermission('stops.create')
+
+  useEffect(() => {
+    document.title = 'Duraklar · MapCepte'
+    const controller = new AbortController()
+
+    apiRequest<StopCatalogItem[]>('/api/stops', {
+      signal: controller.signal,
+    })
+      .then(setStops)
+      .catch((requestError: unknown) => {
+        if (
+          requestError instanceof DOMException &&
+          requestError.name === 'AbortError'
+        ) {
+          return
+        }
+
+        setError(requestErrorMessage(requestError))
+      })
+      .finally(() => setIsLoading(false))
+
+    return () => controller.abort()
+  }, [])
+
+  async function createStop(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setIsCreating(true)
+    setError(null)
+    setMessage(null)
+
+    try {
+      const created = await csrfRequest<StopCatalogItem>('/api/stops', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: name.trim(),
+          code: code.trim() || null,
+          description: description.trim() || null,
+          color,
+          longitude: Number(longitude),
+          latitude: Number(latitude),
+        }),
+      })
+
+      setStops((current) =>
+        [...current, created].toSorted((left, right) =>
+          left.name.localeCompare(right.name, 'tr'),
+        ),
+      )
+      setName('')
+      setCode('')
+      setDescription('')
+      setLongitude('')
+      setLatitude('')
+      setMessage(`${created.name} durağı taslak olarak oluşturuldu.`)
+    } catch (requestError) {
+      setError(requestErrorMessage(requestError))
+    } finally {
+      setIsCreating(false)
+    }
+  }
+
+  return (
+    <main className="admin-page">
+      <div className="page-heading">
+        <div>
+          <p className="eyebrow">Ulaşım kataloğu</p>
+          <h2>Durak yönetimi</h2>
+        </div>
+        <span className="phase-badge dark-badge">{stops.length} durak</span>
+      </div>
+
+      {canCreate && (
+        <form className="stop-create-card" onSubmit={createStop}>
+          <div className="user-create-heading">
+            <div>
+              <p className="eyebrow">Yeni kayıt</p>
+              <h3>Durak oluştur</h3>
+            </div>
+            <span>İlk kayıt durumu: Taslak</span>
+          </div>
+
+          <div className="stop-form-grid">
+            <label>
+              <span>Durak adı</span>
+              <input
+                disabled={isCreating}
+                maxLength={160}
+                onChange={(event) => setName(event.target.value)}
+                required
+                value={name}
+              />
+            </label>
+            <label>
+              <span>Kod</span>
+              <input
+                disabled={isCreating}
+                maxLength={40}
+                onChange={(event) => setCode(event.target.value)}
+                placeholder="Örn. MRK-001"
+                value={code}
+              />
+            </label>
+            <label className="color-field">
+              <span>Renk</span>
+              <input
+                aria-label="Durak rengi"
+                disabled={isCreating}
+                onChange={(event) => setColor(event.target.value)}
+                type="color"
+                value={color}
+              />
+              <code>{color.toUpperCase()}</code>
+            </label>
+            <label>
+              <span>Boylam</span>
+              <input
+                disabled={isCreating}
+                max={180}
+                min={-180}
+                onChange={(event) => setLongitude(event.target.value)}
+                placeholder="32.8597"
+                required
+                step="any"
+                type="number"
+                value={longitude}
+              />
+            </label>
+            <label>
+              <span>Enlem</span>
+              <input
+                disabled={isCreating}
+                max={90}
+                min={-90}
+                onChange={(event) => setLatitude(event.target.value)}
+                placeholder="39.9334"
+                required
+                step="any"
+                type="number"
+                value={latitude}
+              />
+            </label>
+            <label className="description-field">
+              <span>Açıklama</span>
+              <textarea
+                disabled={isCreating}
+                maxLength={1000}
+                onChange={(event) => setDescription(event.target.value)}
+                rows={3}
+                value={description}
+              />
+            </label>
+          </div>
+
+          <button
+            className="primary-button compact-button"
+            disabled={isCreating}
+            type="submit"
+          >
+            {isCreating ? 'Oluşturuluyor…' : 'Durak oluştur'}
+          </button>
+        </form>
+      )}
+
+      {message && <p className="success-message" role="status">{message}</p>}
+      {error && <p className="form-error" role="alert">{error}</p>}
+      {isLoading && <p role="status">Duraklar yükleniyor…</p>}
+
+      {!isLoading && !error && (
+        <div className="stop-grid">
+          {stops.map((stop) => (
+            <article className="stop-card" key={stop.id}>
+              <div className="stop-card-heading">
+                <span
+                  aria-label={`Durak rengi ${stop.color}`}
+                  className="stop-color"
+                  style={{ backgroundColor: stop.color }}
+                />
+                <div>
+                  <h3>{stop.name}</h3>
+                  <code>{stop.code || 'Kod yok'}</code>
+                </div>
+                <span className="stop-status">{stop.status}</span>
+              </div>
+              {stop.description && <p>{stop.description}</p>}
+              <dl>
+                <div>
+                  <dt>Boylam</dt>
+                  <dd>{stop.longitude.toFixed(6)}</dd>
+                </div>
+                <div>
+                  <dt>Enlem</dt>
+                  <dd>{stop.latitude.toFixed(6)}</dd>
+                </div>
+              </dl>
+            </article>
+          ))}
+          {stops.length === 0 && (
+            <div className="empty-stop-list">
+              Görüntüleyebileceğiniz bir durak henüz bulunmuyor.
+            </div>
+          )}
+        </div>
+      )}
+    </main>
+  )
+}
