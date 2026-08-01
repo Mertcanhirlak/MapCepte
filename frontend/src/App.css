@@ -119,7 +119,8 @@ p {
 
 .logout-button,
 .primary-button,
-.secondary-button {
+.secondary-button,
+.archive-button {
   border: 0;
   cursor: pointer;
   font-weight: 800;
@@ -143,7 +144,8 @@ p {
 
 .logout-button:disabled,
 .primary-button:disabled,
-.secondary-button:disabled {
+.secondary-button:disabled,
+.archive-button:disabled {
   cursor: wait;
   opacity: 0.65;
 }
@@ -632,6 +634,11 @@ p {
   text-transform: uppercase;
 }
 
+.stop-status-archived {
+  color: var(--ink-500);
+  background: #e7eeee;
+}
+
 .stop-card > p {
   min-height: 38px;
   margin: 15px 0;
@@ -665,6 +672,62 @@ p {
   color: var(--ink-800);
   font-size: 10px;
   font-weight: 800;
+}
+
+.stop-card-actions {
+  margin-top: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.stop-edit-form {
+  display: grid;
+  gap: 12px;
+}
+
+.stop-edit-form > label,
+.stop-edit-row label {
+  display: grid;
+  gap: 6px;
+  color: var(--ink-700);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.stop-edit-form input,
+.stop-edit-form textarea {
+  min-width: 0;
+  min-height: 39px;
+  padding: 0 10px;
+  border: 1px solid #cfdadd;
+  border-radius: 8px;
+  outline: none;
+  background: white;
+  font: inherit;
+}
+
+.stop-edit-form textarea {
+  min-height: 70px;
+  padding-top: 9px;
+  resize: vertical;
+}
+
+.stop-edit-form input:focus,
+.stop-edit-form textarea:focus {
+  border-color: var(--teal);
+  box-shadow: 0 0 0 3px rgba(19, 184, 166, 0.1);
+}
+
+.stop-edit-row {
+  display: grid;
+  grid-template-columns: 72px repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.stop-edit-row input[type="color"] {
+  width: 100%;
+  padding: 4px;
 }
 
 .empty-stop-list {
@@ -843,6 +906,19 @@ p {
 
 .secondary-button:hover:not(:disabled) {
   border-color: var(--teal);
+}
+
+.archive-button {
+  min-height: 36px;
+  padding: 0 13px;
+  border: 1px solid rgba(239, 111, 108, 0.28);
+  border-radius: 9px;
+  color: #963b38;
+  background: rgba(239, 111, 108, 0.08);
+}
+
+.archive-button:hover:not(:disabled) {
+  background: rgba(239, 111, 108, 0.14);
 }
 
 .inline-error {

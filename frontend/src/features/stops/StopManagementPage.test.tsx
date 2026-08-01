@@ -30,7 +30,12 @@ describe('StopManagementPage', () => {
               email: 'operator@example.com',
               displayName: 'Example Operator',
               roles: ['Operator'],
-              permissions: ['stops.read', 'stops.create'],
+              permissions: [
+                'stops.read',
+                'stops.create',
+                'stops.update',
+                'stops.delete',
+              ],
             }),
           )
         }
@@ -48,6 +53,8 @@ describe('StopManagementPage', () => {
               status: 'Draft',
               createdByUserId: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
               createdAtUtc: '2026-07-30T10:00:00Z',
+              updatedAtUtc: '2026-07-30T10:00:00Z',
+              version: 1,
             },
           ]),
         )
@@ -67,5 +74,7 @@ describe('StopManagementPage', () => {
       screen.getByRole('button', { name: 'Durak oluştur' }),
     ).toBeInTheDocument()
     expect(screen.getByText('MRK-001')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Düzenle' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Arşivle' })).toBeInTheDocument()
   })
 })

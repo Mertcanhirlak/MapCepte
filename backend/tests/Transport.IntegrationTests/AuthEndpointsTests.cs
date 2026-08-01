@@ -48,12 +48,19 @@ public sealed class AuthEndpointsTests
                 PermissionNames.AuditRead,
                 PermissionNames.StopsRead,
                 PermissionNames.StopsCreate,
+                PermissionNames.StopsUpdate,
+                PermissionNames.StopsDelete,
             ]);
 
         var operatorAuthenticationData = new UserAuthenticationData(
             operatorUser,
             [SystemRoleNames.Operator],
-            [PermissionNames.StopsRead, PermissionNames.StopsCreate]);
+            [
+                PermissionNames.StopsRead,
+                PermissionNames.StopsCreate,
+                PermissionNames.StopsUpdate,
+                PermissionNames.StopsDelete,
+            ]);
 
         var roles = new RoleCatalogItem[]
         {
@@ -321,6 +328,65 @@ public sealed class AuthEndpointsTests
     }
 
     [Fact]
+    public async Task StopUpdatesRequireOwnershipAndCurrentVersion()
+    {
+        await LoginAsync("admin@example.com");
+        await RefreshCsrfAsync();
+        var create = await _client.PostAsJsonAsync(
+            "/api/stops",
+            new CreateStopRequest(
+                "Versioned Stop",
+                "VER-001",
+                null,
+                "#13B8A6",
+                32.0,
+                39.0));
+        var created = await create.Content.ReadFromJsonAsync<StopResponse>();
+        Assert.NotNull(created);
+
+        var update = await _client.PutAsJsonAsync(
+            $"/api/stops/{created.Id}",
+            new UpdateStopRequest(
+                "Updated Stop",
+                "VER-001",
+                "Updated",
+                "#F6B84A",
+                33.0,
+                40.0,
+                created.Version));
+        Assert.Equal(HttpStatusCode.OK, update.StatusCode);
+        var updated = await update.Content.ReadFromJsonAsync<StopResponse>();
+        Assert.NotNull(updated);
+        Assert.Equal(created.Version + 1, updated.Version);
+
+        var staleUpdate = await _client.PutAsJsonAsync(
+            $"/api/stops/{created.Id}",
+            new UpdateStopRequest(
+                "Stale Stop",
+                "VER-001",
+                null,
+                "#13B8A6",
+                32.0,
+                39.0,
+                created.Version));
+        Assert.Equal(HttpStatusCode.Conflict, staleUpdate.StatusCode);
+
+        await LoginAsync("operator@example.com");
+        await RefreshCsrfAsync();
+        var forbiddenUpdate = await _client.PutAsJsonAsync(
+            $"/api/stops/{created.Id}",
+            new UpdateStopRequest(
+                "Other Operator",
+                "VER-001",
+                null,
+                "#13B8A6",
+                32.0,
+                39.0,
+                updated.Version));
+        Assert.Equal(HttpStatusCode.Forbidden, forbiddenUpdate.StatusCode);
+    }
+
+    [Fact]
     public async Task LoginWithoutCsrfTokenIsRejected()
     {
         var response = await _client.PostAsJsonAsync(
@@ -435,10 +501,22 @@ public sealed class AuthEndpointsTests
 
         public Task<bool> CodeExistsAsync(
             string normalizedCode,
+            Guid? excludedStopId,
             CancellationToken cancellationToken)
         {
             return Task.FromResult(stops.Any(stopEntity =>
-                stopEntity.NormalizedCode == normalizedCode));
+                stopEntity.NormalizedCode == normalizedCode
+                && (!excludedStopId.HasValue
+                    || stopEntity.Id != excludedStopId.Value)));
+        }
+
+        public Task<Stop?> FindByIdAsync(
+            Guid stopId,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult(
+                stops.SingleOrDefault(stopEntity =>
+                    stopEntity.Id == stopId));
         }
 
         public Task AddAsync(
@@ -449,9 +527,10 @@ public sealed class AuthEndpointsTests
             return Task.CompletedTask;
         }
 
-        public Task SaveChangesAsync(CancellationToken cancellationToken)
+        public Task<bool> SaveChangesAsync(
+            CancellationToken cancellationToken)
         {
-            return Task.CompletedTask;
+            return Task.FromResult(true);
         }
     }
 

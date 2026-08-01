@@ -75,6 +75,12 @@ internal sealed class StopConfiguration : IEntityTypeConfiguration<Stop>
             .HasColumnType("timestamp with time zone")
             .IsRequired();
 
+        builder.Property(stop => stop.Version)
+            .HasColumnName("version")
+            .HasDefaultValue(1L)
+            .IsConcurrencyToken()
+            .IsRequired();
+
         builder.HasOne<User>()
             .WithMany()
             .HasForeignKey(stop => stop.CreatedByUserId)

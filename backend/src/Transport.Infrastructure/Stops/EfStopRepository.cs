@@ -33,10 +33,22 @@ public sealed class EfStopRepository(TransportDbContext dbContext)
 
     public Task<bool> CodeExistsAsync(
         string normalizedCode,
+        Guid? excludedStopId,
         CancellationToken cancellationToken)
     {
         return dbContext.Stops.AnyAsync(
-            stop => stop.NormalizedCode == normalizedCode,
+            stop => stop.NormalizedCode == normalizedCode
+                && (!excludedStopId.HasValue
+                    || stop.Id != excludedStopId.Value),
+            cancellationToken);
+    }
+
+    public Task<Stop?> FindByIdAsync(
+        Guid stopId,
+        CancellationToken cancellationToken)
+    {
+        return dbContext.Stops.SingleOrDefaultAsync(
+            stop => stop.Id == stopId,
             cancellationToken);
     }
 
@@ -47,8 +59,17 @@ public sealed class EfStopRepository(TransportDbContext dbContext)
         await dbContext.Stops.AddAsync(stopEntity, cancellationToken);
     }
 
-    public async Task SaveChangesAsync(CancellationToken cancellationToken)
+    public async Task<bool> SaveChangesAsync(
+        CancellationToken cancellationToken)
     {
-        await dbContext.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+            return true;
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return false;
+        }
     }
 }

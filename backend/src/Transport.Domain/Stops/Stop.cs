@@ -52,6 +52,7 @@ public sealed class Stop
         UpdatedByUserId = createdByUserId;
         CreatedAtUtc = createdAtUtc.ToUniversalTime();
         UpdatedAtUtc = CreatedAtUtc;
+        Version = 1;
     }
 
     public Guid Id { get; private set; }
@@ -78,6 +79,37 @@ public sealed class Stop
 
     public DateTimeOffset UpdatedAtUtc { get; private set; }
 
+    public long Version { get; private set; }
+
+    public void UpdateDetails(
+        string name,
+        string? code,
+        string? description,
+        string color,
+        double longitude,
+        double latitude,
+        Guid updatedByUserId,
+        DateTimeOffset updatedAtUtc)
+    {
+        EnsureCanChange(updatedByUserId);
+        Name = RequireText(name, nameof(name));
+        Code = NormalizeOptionalText(code);
+        NormalizedCode = Code?.ToUpperInvariant();
+        Description = NormalizeOptionalText(description);
+        Color = RequireColor(color);
+        Location = CreateLocation(longitude, latitude);
+        Touch(updatedByUserId, updatedAtUtc);
+    }
+
+    public void Archive(
+        Guid updatedByUserId,
+        DateTimeOffset updatedAtUtc)
+    {
+        EnsureCanChange(updatedByUserId);
+        Status = StopStatus.Archived;
+        Touch(updatedByUserId, updatedAtUtc);
+    }
+
     private static Point CreateLocation(double longitude, double latitude)
     {
         if (!double.IsFinite(longitude) || longitude is < -180 or > 180)
@@ -98,6 +130,29 @@ public sealed class Stop
         {
             SRID = 4326,
         };
+    }
+
+    private void EnsureCanChange(Guid updatedByUserId)
+    {
+        if (updatedByUserId == Guid.Empty)
+        {
+            throw new ArgumentException(
+                "Updater user id cannot be empty.",
+                nameof(updatedByUserId));
+        }
+
+        if (Status == StopStatus.Archived)
+        {
+            throw new InvalidOperationException(
+                "An archived stop cannot be changed.");
+        }
+    }
+
+    private void Touch(Guid updatedByUserId, DateTimeOffset updatedAtUtc)
+    {
+        UpdatedByUserId = updatedByUserId;
+        UpdatedAtUtc = updatedAtUtc.ToUniversalTime();
+        Version++;
     }
 
     private static string RequireText(string value, string parameterName)

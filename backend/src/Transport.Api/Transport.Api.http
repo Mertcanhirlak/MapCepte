@@ -50,6 +50,32 @@ X-CSRF-TOKEN: {{CsrfToken}}
 
 ###
 
+PUT {{Transport.Api_HostAddress}}/api/stops/{{StopId}}
+Content-Type: application/json
+X-CSRF-TOKEN: {{CsrfToken}}
+
+{
+  "name": "Merkez Meydan Güncel",
+  "code": "MRK-001",
+  "description": "Güncellenmiş durak",
+  "color": "#F6B84A",
+  "longitude": 32.8598,
+  "latitude": 39.9335,
+  "version": 1
+}
+
+###
+
+POST {{Transport.Api_HostAddress}}/api/stops/{{StopId}}/archive
+Content-Type: application/json
+X-CSRF-TOKEN: {{CsrfToken}}
+
+{
+  "version": 2
+}
+
+###
+
 POST {{Transport.Api_HostAddress}}/api/admin/users
 Content-Type: application/json
 X-CSRF-TOKEN: {{CsrfToken}}

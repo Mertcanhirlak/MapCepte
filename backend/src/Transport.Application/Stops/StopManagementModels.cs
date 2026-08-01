@@ -9,11 +9,31 @@ public sealed record CreateStopCommand(
     double Longitude,
     double Latitude);
 
+public sealed record UpdateStopCommand(
+    StopAccessContext Access,
+    Guid StopId,
+    string Name,
+    string? Code,
+    string? Description,
+    string Color,
+    double Longitude,
+    double Latitude,
+    long ExpectedVersion);
+
+public sealed record ArchiveStopCommand(
+    StopAccessContext Access,
+    Guid StopId,
+    long ExpectedVersion);
+
 public enum StopManagementStatus
 {
     Success = 0,
     InvalidInput = 1,
     DuplicateCode = 2,
+    NotFound = 3,
+    Forbidden = 4,
+    Conflict = 5,
+    AlreadyArchived = 6,
 }
 
 public sealed record StopManagementResult(

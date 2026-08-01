@@ -11,9 +11,14 @@ public interface IStopRepository
 
     Task<bool> CodeExistsAsync(
         string normalizedCode,
+        Guid? excludedStopId,
+        CancellationToken cancellationToken);
+
+    Task<Stop?> FindByIdAsync(
+        Guid stopId,
         CancellationToken cancellationToken);
 
     Task AddAsync(Stop stopEntity, CancellationToken cancellationToken);
 
-    Task SaveChangesAsync(CancellationToken cancellationToken);
+    Task<bool> SaveChangesAsync(CancellationToken cancellationToken);
 }

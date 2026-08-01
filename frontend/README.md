@@ -38,6 +38,8 @@ Development ortamında `VITE_API_BASE_URL` boş bırakılır; Vite `/api` ve `/h
 - `/stops`, `stops.read` permission'ına sahip kullanıcıların durak listesidir.
 - `stops.create` permission'ı olan Admin ve Operator; ad, kod, açıklama, renk, boylam ve enlem ile taslak durak oluşturabilir.
 - Operator yalnız kendi taslaklarını görür; standart User yalnız yayımlanmış kayıtları okuyabilir.
+- `stops.update` ve `stops.delete` permission'ları kartlarda düzenleme ve arşivleme işlemlerini açar. Arşivleme fiziksel silme yapmaz.
+- Düzenleme formu güncel `version` değerini API'ye gönderir; eşzamanlı değişiklikte kullanıcı veriyi yenileyip tekrar denemelidir.
 - Bu ilk dilimde koordinat sayısal alanlardan girilir. Haritadan nokta seçme sonraki durak diliminde eklenecektir.
 
 ## Kontroller

@@ -10,4 +10,6 @@ public sealed record StopCatalogItem(
     double Latitude,
     string Status,
     Guid CreatedByUserId,
-    DateTimeOffset CreatedAtUtc);
+    DateTimeOffset CreatedAtUtc,
+    DateTimeOffset UpdatedAtUtc,
+    long Version);

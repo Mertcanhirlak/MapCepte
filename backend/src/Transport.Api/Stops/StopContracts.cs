@@ -8,6 +8,17 @@ public sealed record CreateStopRequest(
     double Longitude,
     double Latitude);
 
+public sealed record UpdateStopRequest(
+    string Name,
+    string? Code,
+    string? Description,
+    string Color,
+    double Longitude,
+    double Latitude,
+    long Version);
+
+public sealed record ArchiveStopRequest(long Version);
+
 public sealed record StopResponse(
     Guid Id,
     string Name,
@@ -18,4 +29,6 @@ public sealed record StopResponse(
     double Latitude,
     string Status,
     Guid CreatedByUserId,
-    DateTimeOffset CreatedAtUtc);
+    DateTimeOffset CreatedAtUtc,
+    DateTimeOffset UpdatedAtUtc,
+    long Version);
