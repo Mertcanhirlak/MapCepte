@@ -123,7 +123,10 @@ Yeni bir endpoint'e koruma eklemek için endpoint tanımında `RequirePermission
 - `GET /api/stops`, `stops.read` permission'ı ister.
 - Admin tüm durakları, Operator kendi oluşturduğu durakları, standart User yalnız yayımlanmış durakları görür.
 - `POST /api/stops`, `stops.create` permission'ı ve CSRF token ister.
+- `PUT /api/stops/{id}`, `stops.update`; `POST /api/stops/{id}/archive`, `stops.delete` permission'ı ister.
 - Yeni duraklar `Draft` durumunda, isteği yapan kullanıcıya ait olarak oluşturulur.
+- Operator yalnız kendi durağını güncelleyip arşivleyebilir; Admin tüm durakları yönetebilir.
+- Yazma istekleri istemcinin gördüğü `version` değerini taşır. Kayıt arada değişmişse API `409 Conflict` döndürür.
 - Ad, benzersiz kod, `#RRGGBB` renk ve WGS84 enlem/boylam değerleri doğrulanır.
 - Konum PostgreSQL'de `geography(Point,4326)` olarak saklanır ve GIST spatial indeks kullanır.
 

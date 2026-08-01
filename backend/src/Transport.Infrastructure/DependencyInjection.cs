@@ -38,6 +38,7 @@ public static class DependencyInjection
         services.AddScoped<UserManagementService>();
         services.AddScoped<AuditCatalogService>();
         services.AddScoped<IStopRepository, EfStopRepository>();
+        services.AddSingleton<IStopAccessPolicy, StopAccessPolicy>();
         services.AddScoped<StopManagementService>();
         var maximumFailedAttempts = configuration.GetValue<int?>(
                 "IdentitySecurity:MaximumFailedLoginAttempts")

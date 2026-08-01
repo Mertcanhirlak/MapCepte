@@ -70,17 +70,90 @@ public static class StopEndpoints
                 })
             .RequirePermission(PermissionNames.StopsCreate);
 
+        group.MapPut(
+                "/{stopId:guid}",
+                async (
+                    Guid stopId,
+                    UpdateStopRequest request,
+                    ClaimsPrincipal principal,
+                    StopManagementService stopManagementService,
+                    IAntiforgery antiforgery,
+                    HttpContext httpContext,
+                    CancellationToken cancellationToken) =>
+                {
+                    if (!await antiforgery.IsRequestValidAsync(httpContext))
+                    {
+                        return Results.BadRequest();
+                    }
+
+                    if (!TryGetAccessContext(principal, out var access))
+                    {
+                        return Results.Unauthorized();
+                    }
+
+                    var result = await stopManagementService.UpdateAsync(
+                        new UpdateStopCommand(
+                            access,
+                            stopId,
+                            request.Name,
+                            request.Code,
+                            request.Description,
+                            request.Color,
+                            request.Longitude,
+                            request.Latitude,
+                            request.Version),
+                        cancellationToken);
+
+                    return ToHttpResult(result, created: false);
+                })
+            .RequirePermission(PermissionNames.StopsUpdate);
+
+        group.MapPost(
+                "/{stopId:guid}/archive",
+                async (
+                    Guid stopId,
+                    ArchiveStopRequest request,
+                    ClaimsPrincipal principal,
+                    StopManagementService stopManagementService,
+                    IAntiforgery antiforgery,
+                    HttpContext httpContext,
+                    CancellationToken cancellationToken) =>
+                {
+                    if (!await antiforgery.IsRequestValidAsync(httpContext))
+                    {
+                        return Results.BadRequest();
+                    }
+
+                    if (!TryGetAccessContext(principal, out var access))
+                    {
+                        return Results.Unauthorized();
+                    }
+
+                    var result = await stopManagementService.ArchiveAsync(
+                        new ArchiveStopCommand(
+                            access,
+                            stopId,
+                            request.Version),
+                        cancellationToken);
+
+                    return ToHttpResult(result, created: false);
+                })
+            .RequirePermission(PermissionNames.StopsDelete);
+
         return endpoints;
     }
 
-    private static IResult ToHttpResult(StopManagementResult result)
+    private static IResult ToHttpResult(
+        StopManagementResult result,
+        bool created = true)
     {
         if (result.Status == StopManagementStatus.Success
             && result.Stop is not null)
         {
-            return Results.Created(
-                $"/api/stops/{result.Stop.Id}",
-                ToResponse(result.Stop));
+            var response = ToResponse(result.Stop);
+            return created
+                ? Results.Created($"/api/stops/{result.Stop.Id}", response)
+                : Results.Ok(response);
         }
 
         return result.Status switch
@@ -89,6 +162,14 @@ public static class StopEndpoints
                 new { error = result.Error }),
             StopManagementStatus.InvalidInput => Results.BadRequest(
                 new { error = result.Error }),
+            StopManagementStatus.NotFound => Results.NotFound(
+                new { error = result.Error }),
+            StopManagementStatus.Forbidden => Results.Json(
+                new { error = result.Error },
+                statusCode: StatusCodes.Status403Forbidden),
+            StopManagementStatus.Conflict
+                or StopManagementStatus.AlreadyArchived => Results.Conflict(
+                    new { error = result.Error }),
             _ => Results.Problem(
                 statusCode: StatusCodes.Status500InternalServerError),
         };
@@ -106,7 +187,9 @@ public static class StopEndpoints
             stop.Latitude,
             stop.Status,
             stop.CreatedByUserId,
-            stop.CreatedAtUtc);
+            stop.CreatedAtUtc,
+            stop.UpdatedAtUtc,
+            stop.Version);
     }
 
     private static bool TryGetAccessContext(

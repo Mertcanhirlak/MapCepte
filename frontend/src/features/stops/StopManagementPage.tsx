@@ -13,12 +13,237 @@ export type StopCatalogItem = {
   status: string
   createdByUserId: string
   createdAtUtc: string
+  updatedAtUtc: string
+  version: number
 }
 
 function requestErrorMessage(error: unknown) {
   return error instanceof ApiError
     ? error.message
     : 'Durak servisine bağlanılamadı.'
+}
+
+function StopCard({
+  stop,
+  canUpdate,
+  canArchive,
+  onChanged,
+}: {
+  stop: StopCatalogItem
+  canUpdate: boolean
+  canArchive: boolean
+  onChanged: (stop: StopCatalogItem) => void
+}) {
+  const [isEditing, setIsEditing] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [name, setName] = useState(stop.name)
+  const [code, setCode] = useState(stop.code || '')
+  const [description, setDescription] = useState(stop.description || '')
+  const [color, setColor] = useState(stop.color)
+  const [longitude, setLongitude] = useState(String(stop.longitude))
+  const [latitude, setLatitude] = useState(String(stop.latitude))
+
+  async function updateStop(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setIsSaving(true)
+    setError(null)
+
+    try {
+      const updated = await csrfRequest<StopCatalogItem>(
+        `/api/stops/${stop.id}`,
+        {
+          method: 'PUT',
+          body: JSON.stringify({
+            name: name.trim(),
+            code: code.trim() || null,
+            description: description.trim() || null,
+            color,
+            longitude: Number(longitude),
+            latitude: Number(latitude),
+            version: stop.version,
+          }),
+        },
+      )
+      onChanged(updated)
+      setIsEditing(false)
+    } catch (requestError) {
+      setError(requestErrorMessage(requestError))
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  async function archiveStop() {
+    if (!window.confirm(`${stop.name} durağı arşivlensin mi?`)) {
+      return
+    }
+
+    setIsSaving(true)
+    setError(null)
+    try {
+      const archived = await csrfRequest<StopCatalogItem>(
+        `/api/stops/${stop.id}/archive`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ version: stop.version }),
+        },
+      )
+      onChanged(archived)
+      setIsEditing(false)
+    } catch (requestError) {
+      setError(requestErrorMessage(requestError))
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  if (isEditing) {
+    return (
+      <form className="stop-card stop-edit-form" onSubmit={updateStop}>
+        <label>
+          <span>Durak adı</span>
+          <input
+            disabled={isSaving}
+            maxLength={160}
+            onChange={(event) => setName(event.target.value)}
+            required
+            value={name}
+          />
+        </label>
+        <label>
+          <span>Kod</span>
+          <input
+            disabled={isSaving}
+            maxLength={40}
+            onChange={(event) => setCode(event.target.value)}
+            value={code}
+          />
+        </label>
+        <label>
+          <span>Açıklama</span>
+          <textarea
+            disabled={isSaving}
+            maxLength={1000}
+            onChange={(event) => setDescription(event.target.value)}
+            rows={3}
+            value={description}
+          />
+        </label>
+        <div className="stop-edit-row">
+          <label>
+            <span>Renk</span>
+            <input
+              aria-label="Düzenlenen durak rengi"
+              disabled={isSaving}
+              onChange={(event) => setColor(event.target.value)}
+              type="color"
+              value={color}
+            />
+          </label>
+          <label>
+            <span>Boylam</span>
+            <input
+              disabled={isSaving}
+              max={180}
+              min={-180}
+              onChange={(event) => setLongitude(event.target.value)}
+              required
+              step="any"
+              type="number"
+              value={longitude}
+            />
+          </label>
+          <label>
+            <span>Enlem</span>
+            <input
+              disabled={isSaving}
+              max={90}
+              min={-90}
+              onChange={(event) => setLatitude(event.target.value)}
+              required
+              step="any"
+              type="number"
+              value={latitude}
+            />
+          </label>
+        </div>
+        {error && <p className="inline-error" role="alert">{error}</p>}
+        <div className="stop-card-actions">
+          <button
+            className="primary-button compact-button"
+            disabled={isSaving}
+            type="submit"
+          >
+            {isSaving ? 'Kaydediliyor…' : 'Değişiklikleri kaydet'}
+          </button>
+          <button
+            className="secondary-button"
+            disabled={isSaving}
+            onClick={() => setIsEditing(false)}
+            type="button"
+          >
+            Vazgeç
+          </button>
+        </div>
+      </form>
+    )
+  }
+
+  return (
+    <article className="stop-card">
+      <div className="stop-card-heading">
+        <span
+          aria-label={`Durak rengi ${stop.color}`}
+          className="stop-color"
+          style={{ backgroundColor: stop.color }}
+        />
+        <div>
+          <h3>{stop.name}</h3>
+          <code>{stop.code || 'Kod yok'}</code>
+        </div>
+        <span className={`stop-status stop-status-${stop.status.toLowerCase()}`}>
+          {stop.status}
+        </span>
+      </div>
+      {stop.description && <p>{stop.description}</p>}
+      <dl>
+        <div>
+          <dt>Boylam</dt>
+          <dd>{stop.longitude.toFixed(6)}</dd>
+        </div>
+        <div>
+          <dt>Enlem</dt>
+          <dd>{stop.latitude.toFixed(6)}</dd>
+        </div>
+      </dl>
+      {error && <p className="inline-error" role="alert">{error}</p>}
+      {stop.status !== 'Archived' && (canUpdate || canArchive) && (
+        <div className="stop-card-actions">
+          {canUpdate && (
+            <button
+              className="secondary-button"
+              disabled={isSaving}
+              onClick={() => setIsEditing(true)}
+              type="button"
+            >
+              Düzenle
+            </button>
+          )}
+          {canArchive && (
+            <button
+              className="archive-button"
+              disabled={isSaving}
+              onClick={() => void archiveStop()}
+              type="button"
+            >
+              Arşivle
+            </button>
+          )}
+        </div>
+      )}
+    </article>
+  )
 }
 
 export function StopManagementPage() {
@@ -35,6 +260,8 @@ export function StopManagementPage() {
   const [longitude, setLongitude] = useState('')
   const [latitude, setLatitude] = useState('')
   const canCreate = hasPermission('stops.create')
+  const canUpdate = hasPermission('stops.update')
+  const canArchive = hasPermission('stops.delete')
 
   useEffect(() => {
     document.title = 'Duraklar · MapCepte'
@@ -94,6 +321,13 @@ export function StopManagementPage() {
     } finally {
       setIsCreating(false)
     }
+  }
+
+  function changeStop(changed: StopCatalogItem) {
+    setStops((current) =>
+      current.map((stop) => (stop.id === changed.id ? changed : stop)),
+    )
+    setMessage(`${changed.name} durağı güncellendi.`)
   }
 
   return (
@@ -205,31 +439,13 @@ export function StopManagementPage() {
       {!isLoading && !error && (
         <div className="stop-grid">
           {stops.map((stop) => (
-            <article className="stop-card" key={stop.id}>
-              <div className="stop-card-heading">
-                <span
-                  aria-label={`Durak rengi ${stop.color}`}
-                  className="stop-color"
-                  style={{ backgroundColor: stop.color }}
-                />
-                <div>
-                  <h3>{stop.name}</h3>
-                  <code>{stop.code || 'Kod yok'}</code>
-                </div>
-                <span className="stop-status">{stop.status}</span>
-              </div>
-              {stop.description && <p>{stop.description}</p>}
-              <dl>
-                <div>
-                  <dt>Boylam</dt>
-                  <dd>{stop.longitude.toFixed(6)}</dd>
-                </div>
-                <div>
-                  <dt>Enlem</dt>
-                  <dd>{stop.latitude.toFixed(6)}</dd>
-                </div>
-              </dl>
-            </article>
+            <StopCard
+              canArchive={canArchive}
+              canUpdate={canUpdate}
+              key={stop.id}
+              onChanged={changeStop}
+              stop={stop}
+            />
           ))}
           {stops.length === 0 && (
             <div className="empty-stop-list">

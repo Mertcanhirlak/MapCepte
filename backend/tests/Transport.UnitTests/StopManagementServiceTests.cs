@@ -93,17 +93,123 @@ public sealed class StopManagementServiceTests
         Assert.Equal(StopVisibilityScope.All, repository.LastScope);
     }
 
+    [Fact]
+    public async Task OwnerUpdatesStopAndAdvancesVersion()
+    {
+        var ownerId = Guid.NewGuid();
+        var repository = new FakeStopRepository
+        {
+            ExistingStop = CreateStop(ownerId),
+        };
+        var service = CreateService(repository);
+
+        var result = await service.UpdateAsync(
+            new UpdateStopCommand(
+                new StopAccessContext(ownerId, false, true),
+                repository.ExistingStop.Id,
+                "Updated Stop",
+                "UPD-001",
+                "Updated description",
+                "#F6B84A",
+                33.0,
+                40.0,
+                ExpectedVersion: 1));
+
+        Assert.Equal(StopManagementStatus.Success, result.Status);
+        Assert.Equal(2, result.Stop?.Version);
+        Assert.Equal("Updated Stop", repository.ExistingStop.Name);
+        Assert.Equal(ownerId, repository.ExistingStop.UpdatedByUserId);
+    }
+
+    [Fact]
+    public async Task OtherOperatorCannotUpdateStop()
+    {
+        var repository = new FakeStopRepository
+        {
+            ExistingStop = CreateStop(Guid.NewGuid()),
+        };
+        var service = CreateService(repository);
+
+        var result = await service.UpdateAsync(
+            new UpdateStopCommand(
+                new StopAccessContext(Guid.NewGuid(), false, true),
+                repository.ExistingStop.Id,
+                "Unauthorized Update",
+                null,
+                null,
+                "#13B8A6",
+                32.0,
+                39.0,
+                ExpectedVersion: 1));
+
+        Assert.Equal(StopManagementStatus.Forbidden, result.Status);
+        Assert.Equal(0, repository.SaveCount);
+    }
+
+    [Fact]
+    public async Task RejectsStaleVersionAndArchivesCurrentVersion()
+    {
+        var ownerId = Guid.NewGuid();
+        var repository = new FakeStopRepository
+        {
+            ExistingStop = CreateStop(ownerId),
+        };
+        var service = CreateService(repository);
+        repository.ExistingStop.UpdateDetails(
+            "Already Updated",
+            null,
+            null,
+            "#13B8A6",
+            32.0,
+            39.0,
+            ownerId,
+            FixedNow);
+
+        var staleResult = await service.ArchiveAsync(
+            new ArchiveStopCommand(
+                new StopAccessContext(ownerId, false, true),
+                repository.ExistingStop.Id,
+                ExpectedVersion: 1));
+        Assert.Equal(StopManagementStatus.Conflict, staleResult.Status);
+
+        var archiveResult = await service.ArchiveAsync(
+            new ArchiveStopCommand(
+                new StopAccessContext(ownerId, false, true),
+                repository.ExistingStop.Id,
+                ExpectedVersion: 2));
+        Assert.Equal(StopManagementStatus.Success, archiveResult.Status);
+        Assert.Equal("Archived", archiveResult.Stop?.Status);
+        Assert.Equal(3, archiveResult.Stop?.Version);
+    }
+
     private static StopManagementService CreateService(
         FakeStopRepository repository)
     {
         return new StopManagementService(
             repository,
+            new StopAccessPolicy(),
             new FixedTimeProvider(FixedNow));
+    }
+
+    private static Stop CreateStop(Guid ownerId)
+    {
+        return new Stop(
+            Guid.NewGuid(),
+            "Existing Stop",
+            "EX-001",
+            null,
+            "#13B8A6",
+            32.0,
+            39.0,
+            ownerId,
+            FixedNow);
     }
 
     private sealed class FakeStopRepository : IStopRepository
     {
         public Stop? AddedStop { get; private set; }
+
+        public Stop? ExistingStop { get; init; }
 
         public StopVisibilityScope? LastScope { get; private set; }
 
@@ -120,9 +226,18 @@ public sealed class StopManagementServiceTests
 
         public Task<bool> CodeExistsAsync(
             string normalizedCode,
+            Guid? excludedStopId,
             CancellationToken cancellationToken)
         {
             return Task.FromResult(false);
+        }
+
+        public Task<Stop?> FindByIdAsync(
+            Guid stopId,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult(
+                ExistingStop?.Id == stopId ? ExistingStop : null);
         }
 
         public Task AddAsync(
@@ -133,10 +248,11 @@ public sealed class StopManagementServiceTests
             return Task.CompletedTask;
         }
 
-        public Task SaveChangesAsync(CancellationToken cancellationToken)
+        public Task<bool> SaveChangesAsync(
+            CancellationToken cancellationToken)
         {
             SaveCount++;
-            return Task.CompletedTask;
+            return Task.FromResult(true);
         }
     }
 
