@@ -40,7 +40,9 @@ Development ortamında `VITE_API_BASE_URL` boş bırakılır; Vite `/api` ve `/h
 - Operator yalnız kendi taslaklarını görür; standart User yalnız yayımlanmış kayıtları okuyabilir.
 - `stops.update` ve `stops.delete` permission'ları kartlarda düzenleme ve arşivleme işlemlerini açar. Arşivleme fiziksel silme yapmaz.
 - Düzenleme formu güncel `version` değerini API'ye gönderir; eşzamanlı değişiklikte kullanıcı veriyi yenileyip tekrar denemelidir.
-- Bu ilk dilimde koordinat sayısal alanlardan girilir. Haritadan nokta seçme sonraki durak diliminde eklenecektir.
+- Koordinat haritaya tıklanarak seçilebilir; marker seçilen koordinatı ve durak rengini anlık önizler.
+- Boylam/enlem alanları klavye ve hassas koordinat girişi için kullanılmaya devam eder; elle değişiklik marker'ı da günceller.
+- Durak sayfası ve MapLibre lazy-load edilir; harita paketi uygulamanın ilk açılış paketini büyütmez.
 
 ## Kontroller
 

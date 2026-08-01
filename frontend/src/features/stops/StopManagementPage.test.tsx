@@ -5,6 +5,10 @@ import { AuthProvider } from '../auth/AuthContext'
 import { resetAuthApiForTests } from '../auth/authApi'
 import { StopManagementPage } from './StopManagementPage'
 
+vi.mock('./StopLocationPicker', () => ({
+  StopLocationPicker: () => <div>Harita konum seçici</div>,
+}))
+
 function jsonResponse(body: unknown) {
   return new Response(JSON.stringify(body), {
     status: 200,
@@ -76,5 +80,6 @@ describe('StopManagementPage', () => {
     expect(screen.getByText('MRK-001')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Düzenle' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Arşivle' })).toBeInTheDocument()
+    expect(screen.getByText('Harita konum seçici')).toBeInTheDocument()
   })
 })

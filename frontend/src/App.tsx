@@ -22,13 +22,18 @@ import {
   type LayerVisibility,
   type OperationalLayerId,
 } from './features/map/mapLayers'
-import { StopManagementPage } from './features/stops/StopManagementPage'
 import { API_BASE_URL, useApiStatus } from './shared/useApiStatus'
 
 const TransportMap = lazy(async () => {
   const module = await import('./features/map/TransportMap')
 
   return { default: module.TransportMap }
+})
+
+const StopManagementPage = lazy(async () => {
+  const module = await import('./features/stops/StopManagementPage')
+
+  return { default: module.StopManagementPage }
 })
 
 const apiStatusCopy = {
@@ -182,7 +187,15 @@ function App() {
             path="/stops"
             element={
               <PermissionRoute permission="stops.read" redirectTo="/">
-                <StopManagementPage />
+                <Suspense
+                  fallback={
+                    <main className="admin-page" role="status">
+                      Durak yönetimi yükleniyor…
+                    </main>
+                  }
+                >
+                  <StopManagementPage />
+                </Suspense>
               </PermissionRoute>
             }
           />

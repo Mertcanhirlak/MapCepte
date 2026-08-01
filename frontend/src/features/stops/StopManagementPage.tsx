@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { useAuth } from '../auth/authState'
 import { ApiError, apiRequest, csrfRequest } from '../auth/authApi'
+import { StopLocationPicker } from './StopLocationPicker'
 
 export type StopCatalogItem = {
   id: string
@@ -168,6 +169,17 @@ function StopCard({
             />
           </label>
         </div>
+        <StopLocationPicker
+          color={color}
+          compact
+          disabled={isSaving}
+          latitude={latitude}
+          longitude={longitude}
+          onChange={(coordinates) => {
+            setLongitude(String(coordinates.longitude))
+            setLatitude(String(coordinates.latitude))
+          }}
+        />
         {error && <p className="inline-error" role="alert">{error}</p>}
         <div className="stop-card-actions">
           <button
@@ -421,6 +433,17 @@ export function StopManagementPage() {
               />
             </label>
           </div>
+
+          <StopLocationPicker
+            color={color}
+            disabled={isCreating}
+            latitude={latitude}
+            longitude={longitude}
+            onChange={(coordinates) => {
+              setLongitude(String(coordinates.longitude))
+              setLatitude(String(coordinates.latitude))
+            }}
+          />
 
           <button
             className="primary-button compact-button"
