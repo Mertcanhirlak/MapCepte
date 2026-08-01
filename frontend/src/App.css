@@ -730,6 +730,82 @@ p {
   padding: 4px;
 }
 
+.stop-location-picker {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: #eef3f3;
+}
+
+.picker-heading {
+  min-height: 58px;
+  padding: 11px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.picker-heading > div {
+  display: grid;
+  gap: 3px;
+}
+
+.picker-heading strong {
+  color: var(--ink-800);
+  font-size: 11px;
+}
+
+.picker-heading span,
+.picker-help {
+  color: var(--ink-500);
+  font-size: 9px;
+}
+
+.picker-heading code {
+  color: var(--teal);
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.stop-picker-map-wrap {
+  min-height: 280px;
+  position: relative;
+  background: #dfe7e8;
+}
+
+.stop-picker-map {
+  width: 100%;
+  min-height: 280px;
+}
+
+.compact-picker .stop-picker-map-wrap,
+.compact-picker .stop-picker-map {
+  min-height: 210px;
+}
+
+.picker-map-status {
+  padding: 8px 10px;
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  border-radius: 8px;
+  color: var(--ink-700);
+  background: rgba(255, 255, 255, 0.92);
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.picker-map-error {
+  color: #963b38;
+}
+
+.picker-help {
+  margin: 0;
+  padding: 9px 14px 11px;
+  line-height: 1.5;
+}
+
 .empty-stop-list {
   padding: 40px;
   grid-column: 1 / -1;

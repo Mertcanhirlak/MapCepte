@@ -40,4 +40,4 @@ Frontend varsayılan olarak `http://localhost:5173` adresinde çalışır.
 
 ## Faz durumu
 
-Faz 0 proje temeli ile Faz 1 kimlik doğrulama ve yetkilendirme temeli tamamlanmıştır. Faz 2'de PostGIS tabanlı durak şeması, sahiplik filtreli listeleme, oluşturma, güncelleme, arşivleme ve optimistic concurrency akışları React ekranıyla birlikte hazırdır. Sıradaki dilim haritadan koordinat seçimi ve marker önizlemesidir.
+Faz 0 proje temeli ile Faz 1 kimlik doğrulama ve yetkilendirme temeli tamamlanmıştır. Faz 2'de PostGIS tabanlı durak şeması, sahiplik filtreli CRUD/arşivleme, optimistic concurrency ve haritadan koordinat seçimi React ekranıyla birlikte hazırdır. Sıradaki dilim durak arama, sayfalama ve bbox filtrelemesidir.
