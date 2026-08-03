@@ -49,7 +49,7 @@ export const MAP_LAYER_CATALOG = [
     order: 200,
     toggleable: true,
     visibleInPanel: true,
-    phase: 'Faz 2',
+    phase: 'Hazır',
   },
   {
     id: 'selection',

@@ -18,6 +18,7 @@ public static class StopEndpoints
         group.MapGet(
                 "/",
                 async (
+                    [AsParameters] StopListRequest request,
                     ClaimsPrincipal principal,
                     StopManagementService stopManagementService,
                     CancellationToken cancellationToken) =>
@@ -27,11 +28,36 @@ public static class StopEndpoints
                         return Results.Unauthorized();
                     }
 
-                    var stops = await stopManagementService.ListAsync(
-                        access,
+                    var boundsResult = CreateBounds(request);
+                    if (!boundsResult.IsValid)
+                    {
+                        return Results.BadRequest(
+                            new { error = boundsResult.Error });
+                    }
+
+                    var result = await stopManagementService.ListAsync(
+                        new StopListQuery(
+                            access,
+                            request.Search,
+                            request.Page,
+                            request.PageSize,
+                            boundsResult.Bounds),
                         cancellationToken);
 
-                    return Results.Ok(stops.Select(ToResponse));
+                    if (result.Status != StopManagementStatus.Success
+                        || result.Page is null)
+                    {
+                        return Results.BadRequest(
+                            new { error = result.Error });
+                    }
+
+                    return Results.Ok(
+                        new StopPageResponse(
+                            result.Page.Items.Select(ToResponse).ToArray(),
+                            result.Page.Page,
+                            result.Page.PageSize,
+                            result.Page.TotalCount,
+                            result.Page.TotalPages));
                 })
             .RequirePermission(PermissionNames.StopsRead);
 
@@ -209,6 +235,38 @@ public static class StopEndpoints
         return true;
     }
 
+    private static BoundsResult CreateBounds(StopListRequest request)
+    {
+        var values = new double?[]
+        {
+            request.MinLongitude,
+            request.MinLatitude,
+            request.MaxLongitude,
+            request.MaxLatitude,
+        };
+        var suppliedCount = values.Count(value => value.HasValue);
+
+        if (suppliedCount == 0)
+        {
+            return new BoundsResult(IsValid: true, Bounds: null);
+        }
+
+        if (suppliedCount != values.Length)
+        {
+            return new BoundsResult(
+                IsValid: false,
+                Error: "All four bbox coordinates are required.");
+        }
+
+        return new BoundsResult(
+            IsValid: true,
+            new StopBounds(
+                request.MinLongitude!.Value,
+                request.MinLatitude!.Value,
+                request.MaxLongitude!.Value,
+                request.MaxLatitude!.Value));
+    }
+
     private static bool TryGetUserId(
         ClaimsPrincipal principal,
         out Guid userId)
@@ -217,4 +275,9 @@ public static class StopEndpoints
             principal.FindFirstValue(ClaimTypes.NameIdentifier),
             out userId);
     }
+
+    private sealed record BoundsResult(
+        bool IsValid,
+        StopBounds? Bounds = null,
+        string? Error = null);
 }

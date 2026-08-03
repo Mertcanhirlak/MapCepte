@@ -623,6 +623,141 @@ namespace Transport.Infrastructure.Persistence.Migrations
                     b.ToTable("stops", (string)null);
                 });
 
+            modelBuilder.Entity("Transport.Domain.TransitLines.TransitLine", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("code");
+
+                    b.Property<string>("Color")
+                        .IsRequired()
+                        .HasMaxLength(7)
+                        .HasColumnType("character varying(7)")
+                        .HasColumnName("color");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("description");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("NormalizedCode")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("normalized_code");
+
+                    b.Property<Guid>("OwnerUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("owner_user_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at_utc");
+
+                    b.Property<Guid>("UpdatedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by_user_id");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(1L)
+                        .HasColumnName("version");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("NormalizedCode")
+                        .IsUnique()
+                        .HasDatabaseName("ux_transit_lines_normalized_code");
+
+                    b.HasIndex("OwnerUserId");
+
+                    b.HasIndex("UpdatedByUserId");
+
+                    b.ToTable("transit_lines", (string)null);
+                });
+
+            modelBuilder.Entity("Transport.Domain.TransitLines.TransitLineStop", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<bool>("AlightingAllowed")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("alighting_allowed");
+
+                    b.Property<bool>("BoardingAllowed")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("boarding_allowed");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<int>("Sequence")
+                        .HasColumnType("integer")
+                        .HasColumnName("sequence");
+
+                    b.Property<Guid>("StopId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("stop_id");
+
+                    b.Property<Guid>("TransitLineId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("transit_line_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StopId")
+                        .HasDatabaseName("ix_transit_line_stops_stop_id");
+
+                    b.HasIndex("TransitLineId", "Sequence")
+                        .IsUnique()
+                        .HasDatabaseName("ux_transit_line_stops_line_sequence");
+
+                    b.HasIndex("TransitLineId", "StopId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_transit_line_stops_line_stop");
+
+                    b.ToTable("transit_line_stops", (string)null);
+                });
+
             modelBuilder.Entity("Transport.Domain.Identity.RolePermission", b =>
                 {
                     b.HasOne("Transport.Domain.Identity.Permission", "Permission")
@@ -676,6 +811,42 @@ namespace Transport.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Transport.Domain.TransitLines.TransitLine", b =>
+                {
+                    b.HasOne("Transport.Domain.Identity.User", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Transport.Domain.Identity.User", null)
+                        .WithMany()
+                        .HasForeignKey("OwnerUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Transport.Domain.Identity.User", null)
+                        .WithMany()
+                        .HasForeignKey("UpdatedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Transport.Domain.TransitLines.TransitLineStop", b =>
+                {
+                    b.HasOne("Transport.Domain.Stops.Stop", null)
+                        .WithMany()
+                        .HasForeignKey("StopId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Transport.Domain.TransitLines.TransitLine", null)
+                        .WithMany("Stops")
+                        .HasForeignKey("TransitLineId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Transport.Domain.Identity.Permission", b =>
                 {
                     b.Navigation("RolePermissions");
@@ -691,6 +862,11 @@ namespace Transport.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("Transport.Domain.Identity.User", b =>
                 {
                     b.Navigation("UserRoles");
+                });
+
+            modelBuilder.Entity("Transport.Domain.TransitLines.TransitLine", b =>
+                {
+                    b.Navigation("Stops");
                 });
 #pragma warning restore 612, 618
         }

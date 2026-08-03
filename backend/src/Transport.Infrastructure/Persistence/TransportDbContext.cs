@@ -1,6 +1,10 @@
 using Microsoft.EntityFrameworkCore;
+using Transport.Domain.Calendars;
 using Transport.Domain.Identity;
+using Transport.Domain.RoutePaths;
 using Transport.Domain.Stops;
+using Transport.Domain.TransitLines;
+using Transport.Domain.Trips;
 using Transport.Infrastructure.Persistence.Seeding;
 
 namespace Transport.Infrastructure.Persistence;
@@ -21,6 +25,20 @@ public sealed class TransportDbContext(DbContextOptions<TransportDbContext> opti
     public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
 
     public DbSet<Stop> Stops => Set<Stop>();
+
+    public DbSet<TransitLine> TransitLines => Set<TransitLine>();
+
+    public DbSet<TransitLineStop> TransitLineStops => Set<TransitLineStop>();
+
+    public DbSet<RoutePath> RoutePaths => Set<RoutePath>();
+
+    public DbSet<RoutePathStop> RoutePathStops => Set<RoutePathStop>();
+
+    public DbSet<OperatingCalendar> OperatingCalendars => Set<OperatingCalendar>();
+
+    public DbSet<Trip> Trips => Set<Trip>();
+
+    public DbSet<TripStopTime> TripStopTimes => Set<TripStopTime>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -2,20 +2,13 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { useAuth } from '../auth/authState'
 import { ApiError, apiRequest, csrfRequest } from '../auth/authApi'
 import { StopLocationPicker } from './StopLocationPicker'
+import type { StopCatalogItem, StopPageResponse } from './stopModels'
 
-export type StopCatalogItem = {
-  id: string
-  name: string
-  code: string | null
-  description: string | null
-  color: string
-  longitude: number
-  latitude: number
-  status: string
-  createdByUserId: string
-  createdAtUtc: string
-  updatedAtUtc: string
-  version: number
+type StopBounds = {
+  minLongitude: number
+  minLatitude: number
+  maxLongitude: number
+  maxLatitude: number
 }
 
 function requestErrorMessage(error: unknown) {
@@ -261,6 +254,17 @@ function StopCard({
 export function StopManagementPage() {
   const { hasPermission } = useAuth()
   const [stops, setStops] = useState<StopCatalogItem[]>([])
+  const [page, setPage] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
+  const [totalPages, setTotalPages] = useState(0)
+  const [refreshKey, setRefreshKey] = useState(0)
+  const [searchInput, setSearchInput] = useState('')
+  const [search, setSearch] = useState('')
+  const [bounds, setBounds] = useState<StopBounds | null>(null)
+  const [minLongitude, setMinLongitude] = useState('')
+  const [minLatitude, setMinLatitude] = useState('')
+  const [maxLongitude, setMaxLongitude] = useState('')
+  const [maxLatitude, setMaxLatitude] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [isCreating, setIsCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -278,13 +282,40 @@ export function StopManagementPage() {
   useEffect(() => {
     document.title = 'Duraklar · MapCepte'
     const controller = new AbortController()
+    let isCurrentRequest = true
+    const parameters = new URLSearchParams({
+      page: String(page),
+      pageSize: '12',
+    })
 
-    apiRequest<StopCatalogItem[]>('/api/stops', {
+    if (search) {
+      parameters.set('search', search)
+    }
+
+    if (bounds) {
+      parameters.set('minLongitude', String(bounds.minLongitude))
+      parameters.set('minLatitude', String(bounds.minLatitude))
+      parameters.set('maxLongitude', String(bounds.maxLongitude))
+      parameters.set('maxLatitude', String(bounds.maxLatitude))
+    }
+
+    setIsLoading(true)
+    setError(null)
+    apiRequest<StopPageResponse>(`/api/stops?${parameters}`, {
       signal: controller.signal,
     })
-      .then(setStops)
+      .then((response) => {
+        if (!isCurrentRequest) {
+          return
+        }
+
+        setStops(response.items)
+        setTotalCount(response.totalCount)
+        setTotalPages(response.totalPages)
+      })
       .catch((requestError: unknown) => {
         if (
+          !isCurrentRequest ||
           requestError instanceof DOMException &&
           requestError.name === 'AbortError'
         ) {
@@ -293,10 +324,68 @@ export function StopManagementPage() {
 
         setError(requestErrorMessage(requestError))
       })
-      .finally(() => setIsLoading(false))
+      .finally(() => {
+        if (isCurrentRequest) {
+          setIsLoading(false)
+        }
+      })
 
-    return () => controller.abort()
-  }, [])
+    return () => {
+      isCurrentRequest = false
+      controller.abort()
+    }
+  }, [bounds, page, refreshKey, search])
+
+  function applyFilters(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const coordinateValues = [
+      minLongitude,
+      minLatitude,
+      maxLongitude,
+      maxLatitude,
+    ]
+    const filledCoordinateCount = coordinateValues.filter(Boolean).length
+
+    if (filledCoordinateCount !== 0 && filledCoordinateCount !== 4) {
+      setError('Harita alanı için dört sınır değerini de girin.')
+      return
+    }
+
+    const nextBounds = filledCoordinateCount === 4
+      ? {
+          minLongitude: Number(minLongitude),
+          minLatitude: Number(minLatitude),
+          maxLongitude: Number(maxLongitude),
+          maxLatitude: Number(maxLatitude),
+        }
+      : null
+
+    if (
+      nextBounds &&
+      (nextBounds.minLongitude >= nextBounds.maxLongitude ||
+        nextBounds.minLatitude >= nextBounds.maxLatitude)
+    ) {
+      setError('Minimum sınırlar maksimum sınırlardan küçük olmalıdır.')
+      return
+    }
+
+    setError(null)
+    setPage(1)
+    setSearch(searchInput.trim())
+    setBounds(nextBounds)
+  }
+
+  function clearFilters() {
+    setSearchInput('')
+    setMinLongitude('')
+    setMinLatitude('')
+    setMaxLongitude('')
+    setMaxLatitude('')
+    setSearch('')
+    setBounds(null)
+    setPage(1)
+    setError(null)
+  }
 
   async function createStop(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -317,11 +406,8 @@ export function StopManagementPage() {
         }),
       })
 
-      setStops((current) =>
-        [...current, created].toSorted((left, right) =>
-          left.name.localeCompare(right.name, 'tr'),
-        ),
-      )
+      setPage(1)
+      setRefreshKey((current) => current + 1)
       setName('')
       setCode('')
       setDescription('')
@@ -336,9 +422,7 @@ export function StopManagementPage() {
   }
 
   function changeStop(changed: StopCatalogItem) {
-    setStops((current) =>
-      current.map((stop) => (stop.id === changed.id ? changed : stop)),
-    )
+    setRefreshKey((current) => current + 1)
     setMessage(`${changed.name} durağı güncellendi.`)
   }
 
@@ -349,7 +433,7 @@ export function StopManagementPage() {
           <p className="eyebrow">Ulaşım kataloğu</p>
           <h2>Durak yönetimi</h2>
         </div>
-        <span className="phase-badge dark-badge">{stops.length} durak</span>
+        <span className="phase-badge dark-badge">{totalCount} durak</span>
       </div>
 
       {canCreate && (
@@ -455,27 +539,82 @@ export function StopManagementPage() {
         </form>
       )}
 
+      <form className="stop-filter-card" onSubmit={applyFilters}>
+        <div className="stop-filter-heading">
+          <div>
+            <p className="eyebrow">Liste filtreleri</p>
+            <h3>Durak ara ve harita alanını sınırla</h3>
+          </div>
+          <button className="secondary-button" onClick={clearFilters} type="button">
+            Filtreleri temizle
+          </button>
+        </div>
+        <label>
+          <span>Ad veya kod</span>
+          <input
+            maxLength={160}
+            onChange={(event) => setSearchInput(event.target.value)}
+            placeholder="Örn. Merkez veya MRK-001"
+            value={searchInput}
+          />
+        </label>
+        <div className="stop-bounds-grid">
+          <label>
+            <span>Min. boylam</span>
+            <input max={180} min={-180} onChange={(event) => setMinLongitude(event.target.value)} step="any" type="number" value={minLongitude} />
+          </label>
+          <label>
+            <span>Min. enlem</span>
+            <input max={90} min={-90} onChange={(event) => setMinLatitude(event.target.value)} step="any" type="number" value={minLatitude} />
+          </label>
+          <label>
+            <span>Maks. boylam</span>
+            <input max={180} min={-180} onChange={(event) => setMaxLongitude(event.target.value)} step="any" type="number" value={maxLongitude} />
+          </label>
+          <label>
+            <span>Maks. enlem</span>
+            <input max={90} min={-90} onChange={(event) => setMaxLatitude(event.target.value)} step="any" type="number" value={maxLatitude} />
+          </label>
+        </div>
+        <button className="primary-button compact-button" type="submit">
+          Filtreleri uygula
+        </button>
+      </form>
+
       {message && <p className="success-message" role="status">{message}</p>}
       {error && <p className="form-error" role="alert">{error}</p>}
       {isLoading && <p role="status">Duraklar yükleniyor…</p>}
 
       {!isLoading && !error && (
-        <div className="stop-grid">
-          {stops.map((stop) => (
-            <StopCard
-              canArchive={canArchive}
-              canUpdate={canUpdate}
-              key={stop.id}
-              onChanged={changeStop}
-              stop={stop}
-            />
-          ))}
-          {stops.length === 0 && (
-            <div className="empty-stop-list">
-              Görüntüleyebileceğiniz bir durak henüz bulunmuyor.
-            </div>
+        <>
+          <div className="stop-grid">
+            {stops.map((stop) => (
+              <StopCard
+                canArchive={canArchive}
+                canUpdate={canUpdate}
+                key={stop.id}
+                onChanged={changeStop}
+                stop={stop}
+              />
+            ))}
+            {stops.length === 0 && (
+              <div className="empty-stop-list">
+                Filtrelere uyan, görüntüleyebileceğiniz bir durak bulunmuyor.
+              </div>
+            )}
+          </div>
+          {totalPages > 0 && (
+            <nav aria-label="Durak sayfaları" className="stop-pagination">
+              <button className="secondary-button" disabled={page <= 1} onClick={() => setPage((current) => current - 1)} type="button">
+                Önceki
+              </button>
+              <span>Sayfa {page} / {totalPages}</span>
+              <button className="secondary-button" disabled={page >= totalPages} onClick={() => setPage((current) => current + 1)} type="button">
+                Sonraki
+              </button>
+            </nav>
           )}
-        </div>
+        </>
       )}
     </main>
   )

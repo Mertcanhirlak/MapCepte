@@ -321,10 +321,22 @@ public sealed class AuthEndpointsTests
         Assert.Equal(32.8597, created.Longitude);
         Assert.Equal(39.9334, created.Latitude);
 
-        var stops = await _client.GetFromJsonAsync<StopResponse[]>(
+        var stops = await _client.GetFromJsonAsync<StopPageResponse>(
             "/api/stops");
         Assert.NotNull(stops);
-        Assert.Contains(stops, stop => stop.Id == created.Id);
+        Assert.Equal(1, stops.TotalCount);
+        Assert.Contains(stops.Items, stop => stop.Id == created.Id);
+
+        var filteredStops = await _client.GetFromJsonAsync<StopPageResponse>(
+            "/api/stops?search=Merkez&page=1&pageSize=10"
+            + "&minLongitude=32&minLatitude=39"
+            + "&maxLongitude=33&maxLatitude=40");
+        Assert.NotNull(filteredStops);
+        Assert.Single(filteredStops.Items);
+
+        var partialBounds = await _client.GetAsync(
+            "/api/stops?minLongitude=32");
+        Assert.Equal(HttpStatusCode.BadRequest, partialBounds.StatusCode);
     }
 
     [Fact]
@@ -478,17 +490,16 @@ public sealed class AuthEndpointsTests
     {
         private readonly List<Stop> stops = [];
 
-        public Task<IReadOnlyCollection<Stop>> ListAsync(
-            Guid actorUserId,
-            StopVisibilityScope scope,
+        public Task<StopRepositoryPage> ListAsync(
+            StopRepositoryQuery query,
             CancellationToken cancellationToken)
         {
-            IReadOnlyCollection<Stop> result = scope switch
+            IEnumerable<Stop> result = query.Scope switch
             {
                 StopVisibilityScope.All => stops.ToArray(),
                 StopVisibilityScope.Owned => stops
                     .Where(stopEntity =>
-                        stopEntity.CreatedByUserId == actorUserId)
+                        stopEntity.CreatedByUserId == query.ActorUserId)
                     .ToArray(),
                 StopVisibilityScope.Published => stops
                     .Where(stopEntity =>
@@ -496,7 +507,35 @@ public sealed class AuthEndpointsTests
                     .ToArray(),
                 _ => [],
             };
-            return Task.FromResult(result);
+
+            if (query.Search is not null)
+            {
+                result = result.Where(stopEntity =>
+                    stopEntity.Name.Contains(
+                        query.Search,
+                        StringComparison.OrdinalIgnoreCase)
+                    || stopEntity.Code?.Contains(
+                        query.Search,
+                        StringComparison.OrdinalIgnoreCase) == true);
+            }
+
+            if (query.Bounds is not null)
+            {
+                result = result.Where(stopEntity =>
+                    stopEntity.Location.X >= query.Bounds.MinLongitude
+                    && stopEntity.Location.X <= query.Bounds.MaxLongitude
+                    && stopEntity.Location.Y >= query.Bounds.MinLatitude
+                    && stopEntity.Location.Y <= query.Bounds.MaxLatitude);
+            }
+
+            var filtered = result.ToArray();
+            return Task.FromResult(
+                new StopRepositoryPage(
+                    filtered
+                        .Skip((query.Page - 1) * query.PageSize)
+                        .Take(query.PageSize)
+                        .ToArray(),
+                    filtered.Length));
         }
 
         public Task<bool> CodeExistsAsync(
@@ -517,6 +556,17 @@ public sealed class AuthEndpointsTests
             return Task.FromResult(
                 stops.SingleOrDefault(stopEntity =>
                     stopEntity.Id == stopId));
+        }
+
+        public Task<IReadOnlyDictionary<Guid, Stop>> FindByIdsAsync(
+            IEnumerable<Guid> stopIds,
+            CancellationToken cancellationToken)
+        {
+            var idSet = stopIds.ToHashSet();
+            IReadOnlyDictionary<Guid, Stop> dict = stops
+                .Where(s => idSet.Contains(s.Id))
+                .ToDictionary(s => s.Id);
+            return Task.FromResult(dict);
         }
 
         public Task AddAsync(

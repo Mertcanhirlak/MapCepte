@@ -3,10 +3,14 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Transport.Api.Authorization;
+using Transport.Api.Calendars;
 using Transport.Api.Contracts;
 using Transport.Api.Health;
 using Transport.Api.Identity;
+using Transport.Api.RoutePaths;
 using Transport.Api.Stops;
+using Transport.Api.TransitLines;
+using Transport.Api.Trips;
 using Transport.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -112,6 +116,10 @@ app.UseAntiforgery();
 app.MapAuthEndpoints();
 app.MapAdminEndpoints();
 app.MapStopEndpoints();
+app.MapTransitLineEndpoints();
+app.MapRoutePathEndpoints();
+app.MapOperatingCalendarEndpoints();
+app.MapTripEndpoints();
 
 app.MapGet(
         "/api/system",
@@ -119,7 +127,7 @@ app.MapGet(
             new SystemInfoResponse(
                 Name: "MapCepte Transport API",
                 Runtime: ".NET 10",
-                Phase: "StopManagement")))
+                Phase: "TripAndTimetableManagement")))
     .WithName("GetSystemInfo")
     .WithTags("System");
 

@@ -3,6 +3,7 @@ import {
   AttributionControl,
   Map as MapLibreMap,
   NavigationControl,
+  type GeoJSONSource,
 } from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import {
@@ -12,9 +13,19 @@ import {
   type LayerVisibility,
 } from './mapLayers'
 import { configuredMapStyle, TURKEY_MAP_CENTER } from './mapStyle'
+import {
+  createStopFeatureCollection,
+  type MapBounds,
+} from './stopMapData'
+import { createRouteFeatureCollection } from './routeMapData'
+import type { RoutePathCatalogItem } from '../route-paths/routePathModels'
+import type { StopCatalogItem } from '../stops/stopModels'
 
 interface TransportMapProps {
   visibility: LayerVisibility
+  stops: StopCatalogItem[]
+  routes?: RoutePathCatalogItem[]
+  onBoundsChange: (bounds: MapBounds) => void
 }
 
 const emptyFeatureCollection = () => ({
@@ -26,11 +37,21 @@ function mapVisibility(isVisible: boolean): 'visible' | 'none' {
   return isVisible ? 'visible' : 'none'
 }
 
-function addOperationalLayers(map: MapLibreMap, visibility: LayerVisibility) {
+function addOperationalLayers(
+  map: MapLibreMap,
+  visibility: LayerVisibility,
+  stops: StopCatalogItem[],
+  routes: RoutePathCatalogItem[] = [],
+) {
   for (const layerId of OPERATIONAL_LAYER_IDS) {
     map.addSource(MAP_SOURCE_IDS[layerId], {
       type: 'geojson',
-      data: emptyFeatureCollection(),
+      data:
+        layerId === 'stops'
+          ? createStopFeatureCollection(stops)
+          : layerId === 'routes'
+            ? createRouteFeatureCollection(routes)
+            : emptyFeatureCollection(),
     })
   }
 
@@ -44,7 +65,7 @@ function addOperationalLayers(map: MapLibreMap, visibility: LayerVisibility) {
       'line-join': 'round',
     },
     paint: {
-      'line-color': '#13b8a6',
+      'line-color': ['coalesce', ['get', 'color'], '#13b8a6'],
       'line-width': 5,
       'line-opacity': 0.88,
     },
@@ -59,7 +80,7 @@ function addOperationalLayers(map: MapLibreMap, visibility: LayerVisibility) {
     },
     paint: {
       'circle-radius': 7,
-      'circle-color': '#f6b84a',
+      'circle-color': ['coalesce', ['get', 'color'], '#f6b84a'],
       'circle-stroke-color': '#152630',
       'circle-stroke-width': 2,
     },
@@ -96,12 +117,32 @@ function addOperationalLayers(map: MapLibreMap, visibility: LayerVisibility) {
   })
 }
 
-export function TransportMap({ visibility }: TransportMapProps) {
+function currentMapBounds(map: MapLibreMap): MapBounds {
+  const bounds = map.getBounds()
+  return {
+    minLongitude: Math.max(-180, Number(bounds.getWest().toFixed(6))),
+    minLatitude: Math.max(-90, Number(bounds.getSouth().toFixed(6))),
+    maxLongitude: Math.min(180, Number(bounds.getEast().toFixed(6))),
+    maxLatitude: Math.min(90, Number(bounds.getNorth().toFixed(6))),
+  }
+}
+
+export function TransportMap({
+  visibility,
+  stops,
+  routes,
+  onBoundsChange,
+}: TransportMapProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<MapLibreMap | null>(null)
   const initialVisibilityRef = useRef(visibility)
+  const initialStopsRef = useRef(stops)
+  const initialRoutesRef = useRef(routes)
+  const onBoundsChangeRef = useRef(onBoundsChange)
   const [isReady, setIsReady] = useState(false)
   const [hasError, setHasError] = useState(false)
+
+  onBoundsChangeRef.current = onBoundsChange
 
   useEffect(() => {
     if (!containerRef.current) {
@@ -122,8 +163,18 @@ export function TransportMap({ visibility }: TransportMapProps) {
     map.addControl(new AttributionControl({ compact: true }))
 
     map.on('load', () => {
-      addOperationalLayers(map, initialVisibilityRef.current)
+      addOperationalLayers(
+        map,
+        initialVisibilityRef.current,
+        initialStopsRef.current,
+        initialRoutesRef.current,
+      )
       setIsReady(true)
+      onBoundsChangeRef.current(currentMapBounds(map))
+    })
+
+    map.on('moveend', () => {
+      onBoundsChangeRef.current(currentMapBounds(map))
     })
 
     map.on('error', () => {
@@ -156,6 +207,30 @@ export function TransportMap({ visibility }: TransportMapProps) {
     }
   }, [isReady, visibility])
 
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !isReady) {
+      return
+    }
+
+    const source = map.getSource(
+      MAP_SOURCE_IDS.stops,
+    ) as GeoJSONSource | undefined
+    source?.setData(createStopFeatureCollection(stops))
+  }, [isReady, stops])
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !isReady) {
+      return
+    }
+
+    const source = map.getSource(
+      MAP_SOURCE_IDS.routes,
+    ) as GeoJSONSource | undefined
+    source?.setData(createRouteFeatureCollection(routes || []))
+  }, [isReady, routes])
+
   return (
     <div className="map-frame">
       <div
@@ -176,9 +251,13 @@ export function TransportMap({ visibility }: TransportMapProps) {
         </div>
       )}
 
-      <div className="map-empty-state">
-        <span>Katman altyapısı hazır</span>
-        <strong>Durak ve rota verileri sonraki fazlarda bağlanacak.</strong>
+      <div className="map-empty-state" role="status">
+        <span>Görünür harita alanı</span>
+        <strong>
+          {stops.length > 0
+            ? `${stops.length} durak haritada gösteriliyor.`
+            : 'Bu alanda görüntülenebilir durak bulunmuyor.'}
+        </strong>
       </div>
     </div>
   )

@@ -11,28 +11,50 @@ public sealed class StopManagementService(
     private static readonly SearchValues<char> HexadecimalCharacters =
         SearchValues.Create("0123456789abcdefABCDEF");
 
-    public async Task<IReadOnlyCollection<StopCatalogItem>> ListAsync(
-        StopAccessContext access,
+    public async Task<StopListResult> ListAsync(
+        StopListQuery query,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(access);
-        if (access.UserId == Guid.Empty)
+        ArgumentNullException.ThrowIfNull(query);
+        var validationError = ValidateList(query);
+        if (validationError is not null)
         {
-            return [];
+            return new StopListResult(
+                StopManagementStatus.InvalidInput,
+                Error: validationError);
         }
 
-        var scope = access.IsAdmin
+        var scope = query.Access.IsAdmin
             ? StopVisibilityScope.All
-            : access.IsOperator
+            : query.Access.IsOperator
                 ? StopVisibilityScope.Owned
                 : StopVisibilityScope.Published;
 
-        var stops = await stopRepository.ListAsync(
-            access.UserId,
-            scope,
+        var repositoryPage = await stopRepository.ListAsync(
+            new StopRepositoryQuery(
+                query.Access.UserId,
+                scope,
+                string.IsNullOrWhiteSpace(query.Search)
+                    ? null
+                    : query.Search.Trim(),
+                query.Page,
+                query.PageSize,
+                query.Bounds),
             cancellationToken);
 
-        return stops.Select(ToCatalogItem).ToArray();
+        var totalPages = repositoryPage.TotalCount == 0
+            ? 0
+            : (int)Math.Ceiling(
+                repositoryPage.TotalCount / (double)query.PageSize);
+
+        return new StopListResult(
+            StopManagementStatus.Success,
+            new StopCatalogPage(
+                repositoryPage.Items.Select(ToCatalogItem).ToArray(),
+                query.Page,
+                query.PageSize,
+                repositoryPage.TotalCount,
+                totalPages));
     }
 
     public async Task<StopManagementResult> CreateAsync(
@@ -209,6 +231,46 @@ public sealed class StopManagementService(
             || command.Latitude is < -90 or > 90)
         {
             return "Latitude must be between -90 and 90.";
+        }
+
+        return null;
+    }
+
+    private static string? ValidateList(StopListQuery query)
+    {
+        if (query.Access is null || query.Access.UserId == Guid.Empty)
+        {
+            return "A valid actor is required.";
+        }
+
+        if (query.Page <= 0 || query.PageSize is <= 0 or > 100)
+        {
+            return "Page must be positive and pageSize must be between 1 and 100.";
+        }
+
+        if (query.Search?.Trim().Length > 160)
+        {
+            return "Search must contain at most 160 characters.";
+        }
+
+        if (query.Bounds is null)
+        {
+            return null;
+        }
+
+        var bounds = query.Bounds;
+        if (!double.IsFinite(bounds.MinLongitude)
+            || !double.IsFinite(bounds.MaxLongitude)
+            || !double.IsFinite(bounds.MinLatitude)
+            || !double.IsFinite(bounds.MaxLatitude)
+            || bounds.MinLongitude is < -180 or > 180
+            || bounds.MaxLongitude is < -180 or > 180
+            || bounds.MinLatitude is < -90 or > 90
+            || bounds.MaxLatitude is < -90 or > 90
+            || bounds.MinLongitude >= bounds.MaxLongitude
+            || bounds.MinLatitude >= bounds.MaxLatitude)
+        {
+            return "Bounds must define a valid WGS84 rectangle.";
         }
 
         return null;

@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using NetTopologySuite.Geometries;
 using Transport.Application.Stops;
 using Transport.Domain.Stops;
 using Transport.Infrastructure.Persistence;
@@ -8,27 +9,47 @@ namespace Transport.Infrastructure.Stops;
 public sealed class EfStopRepository(TransportDbContext dbContext)
     : IStopRepository
 {
-    public async Task<IReadOnlyCollection<Stop>> ListAsync(
-        Guid actorUserId,
-        StopVisibilityScope scope,
+    public async Task<StopRepositoryPage> ListAsync(
+        StopRepositoryQuery query,
         CancellationToken cancellationToken)
     {
-        var query = dbContext.Stops.AsNoTracking();
+        var stopsQuery = dbContext.Stops.AsNoTracking();
 
-        query = scope switch
+        stopsQuery = query.Scope switch
         {
-            StopVisibilityScope.All => query,
-            StopVisibilityScope.Owned => query.Where(stop =>
-                stop.CreatedByUserId == actorUserId),
-            StopVisibilityScope.Published => query.Where(stop =>
+            StopVisibilityScope.All => stopsQuery,
+            StopVisibilityScope.Owned => stopsQuery.Where(stop =>
+                stop.CreatedByUserId == query.ActorUserId),
+            StopVisibilityScope.Published => stopsQuery.Where(stop =>
                 stop.Status == StopStatus.Published),
-            _ => throw new ArgumentOutOfRangeException(nameof(scope)),
+            _ => throw new ArgumentOutOfRangeException(nameof(query)),
         };
 
-        return await query
+        if (query.Search is not null)
+        {
+            var pattern = $"%{EscapeLikePattern(query.Search)}%";
+            stopsQuery = stopsQuery.Where(stop =>
+                EF.Functions.ILike(stop.Name, pattern, "\\")
+                || stop.Code != null
+                && EF.Functions.ILike(stop.Code, pattern, "\\"));
+        }
+
+        if (query.Bounds is not null)
+        {
+            var boundingPolygon = CreateBoundingPolygon(query.Bounds);
+            stopsQuery = stopsQuery.Where(stop =>
+                stop.Location.Intersects(boundingPolygon));
+        }
+
+        var totalCount = await stopsQuery.CountAsync(cancellationToken);
+        var items = await stopsQuery
             .OrderBy(stop => stop.Name)
             .ThenBy(stop => stop.Code)
+            .Skip((query.Page - 1) * query.PageSize)
+            .Take(query.PageSize)
             .ToArrayAsync(cancellationToken);
+
+        return new StopRepositoryPage(items, totalCount);
     }
 
     public Task<bool> CodeExistsAsync(
@@ -52,6 +73,23 @@ public sealed class EfStopRepository(TransportDbContext dbContext)
             cancellationToken);
     }
 
+    public async Task<IReadOnlyDictionary<Guid, Stop>> FindByIdsAsync(
+        IEnumerable<Guid> stopIds,
+        CancellationToken cancellationToken)
+    {
+        var ids = stopIds.Distinct().ToArray();
+        if (ids.Length == 0)
+        {
+            return new Dictionary<Guid, Stop>();
+        }
+
+        var stops = await dbContext.Stops
+            .Where(stop => ids.Contains(stop.Id))
+            .ToDictionaryAsync(stop => stop.Id, cancellationToken);
+
+        return stops;
+    }
+
     public async Task AddAsync(
         Stop stopEntity,
         CancellationToken cancellationToken)
@@ -71,5 +109,39 @@ public sealed class EfStopRepository(TransportDbContext dbContext)
         {
             return false;
         }
+    }
+
+    private static string EscapeLikePattern(string value)
+    {
+        return value
+            .Replace("\\", "\\\\", StringComparison.Ordinal)
+            .Replace("%", "\\%", StringComparison.Ordinal)
+            .Replace("_", "\\_", StringComparison.Ordinal);
+    }
+
+    private static Polygon CreateBoundingPolygon(StopBounds bounds)
+    {
+        return new Polygon(
+            new LinearRing(
+            [
+                new Coordinate(
+                    bounds.MinLongitude,
+                    bounds.MinLatitude),
+                new Coordinate(
+                    bounds.MaxLongitude,
+                    bounds.MinLatitude),
+                new Coordinate(
+                    bounds.MaxLongitude,
+                    bounds.MaxLatitude),
+                new Coordinate(
+                    bounds.MinLongitude,
+                    bounds.MaxLatitude),
+                new Coordinate(
+                    bounds.MinLongitude,
+                    bounds.MinLatitude),
+            ]))
+        {
+            SRID = 4326,
+        };
     }
 }

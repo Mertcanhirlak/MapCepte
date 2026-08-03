@@ -72,25 +72,55 @@ public sealed class StopManagementServiceTests
         var actorUserId = Guid.NewGuid();
 
         await service.ListAsync(
-            new StopAccessContext(
-                actorUserId,
-                IsAdmin: false,
-                IsOperator: true));
-        Assert.Equal(StopVisibilityScope.Owned, repository.LastScope);
+            CreateListQuery(
+                new StopAccessContext(
+                    actorUserId,
+                    IsAdmin: false,
+                    IsOperator: true)));
+        Assert.Equal(
+            StopVisibilityScope.Owned,
+            repository.LastQuery?.Scope);
 
         await service.ListAsync(
-            new StopAccessContext(
-                actorUserId,
-                IsAdmin: false,
-                IsOperator: false));
-        Assert.Equal(StopVisibilityScope.Published, repository.LastScope);
+            CreateListQuery(
+                new StopAccessContext(
+                    actorUserId,
+                    IsAdmin: false,
+                    IsOperator: false)));
+        Assert.Equal(
+            StopVisibilityScope.Published,
+            repository.LastQuery?.Scope);
 
         await service.ListAsync(
-            new StopAccessContext(
-                actorUserId,
-                IsAdmin: true,
-                IsOperator: false));
-        Assert.Equal(StopVisibilityScope.All, repository.LastScope);
+            CreateListQuery(
+                new StopAccessContext(
+                    actorUserId,
+                    IsAdmin: true,
+                    IsOperator: false)));
+        Assert.Equal(
+            StopVisibilityScope.All,
+            repository.LastQuery?.Scope);
+    }
+
+    [Fact]
+    public async Task ValidatesPaginationAndBoundingBox()
+    {
+        var repository = new FakeStopRepository();
+        var service = CreateService(repository);
+        var access = new StopAccessContext(Guid.NewGuid(), true, false);
+
+        var invalidPage = await service.ListAsync(
+            new StopListQuery(access, null, 0, 20, null));
+        Assert.Equal(StopManagementStatus.InvalidInput, invalidPage.Status);
+
+        var invalidBounds = await service.ListAsync(
+            new StopListQuery(
+                access,
+                null,
+                1,
+                20,
+                new StopBounds(33, 40, 32, 39)));
+        Assert.Equal(StopManagementStatus.InvalidInput, invalidBounds.Status);
     }
 
     [Fact]
@@ -205,23 +235,33 @@ public sealed class StopManagementServiceTests
             FixedNow);
     }
 
+    private static StopListQuery CreateListQuery(StopAccessContext access)
+    {
+        return new StopListQuery(
+            access,
+            Search: null,
+            Page: 1,
+            PageSize: 20,
+            Bounds: null);
+    }
+
     private sealed class FakeStopRepository : IStopRepository
     {
         public Stop? AddedStop { get; private set; }
 
         public Stop? ExistingStop { get; init; }
 
-        public StopVisibilityScope? LastScope { get; private set; }
+        public StopRepositoryQuery? LastQuery { get; private set; }
 
         public int SaveCount { get; private set; }
 
-        public Task<IReadOnlyCollection<Stop>> ListAsync(
-            Guid actorUserId,
-            StopVisibilityScope scope,
+        public Task<StopRepositoryPage> ListAsync(
+            StopRepositoryQuery query,
             CancellationToken cancellationToken)
         {
-            LastScope = scope;
-            return Task.FromResult<IReadOnlyCollection<Stop>>([]);
+            LastQuery = query;
+            return Task.FromResult(
+                new StopRepositoryPage([], TotalCount: 0));
         }
 
         public Task<bool> CodeExistsAsync(
@@ -238,6 +278,18 @@ public sealed class StopManagementServiceTests
         {
             return Task.FromResult(
                 ExistingStop?.Id == stopId ? ExistingStop : null);
+        }
+
+        public Task<IReadOnlyDictionary<Guid, Stop>> FindByIdsAsync(
+            IEnumerable<Guid> stopIds,
+            CancellationToken cancellationToken)
+        {
+            var dict = new Dictionary<Guid, Stop>();
+            if (ExistingStop is not null && stopIds.Contains(ExistingStop.Id))
+            {
+                dict[ExistingStop.Id] = ExistingStop;
+            }
+            return Task.FromResult<IReadOnlyDictionary<Guid, Stop>>(dict);
         }
 
         public Task AddAsync(

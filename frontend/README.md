@@ -42,7 +42,10 @@ Development ortamında `VITE_API_BASE_URL` boş bırakılır; Vite `/api` ve `/h
 - Düzenleme formu güncel `version` değerini API'ye gönderir; eşzamanlı değişiklikte kullanıcı veriyi yenileyip tekrar denemelidir.
 - Koordinat haritaya tıklanarak seçilebilir; marker seçilen koordinatı ve durak rengini anlık önizler.
 - Boylam/enlem alanları klavye ve hassas koordinat girişi için kullanılmaya devam eder; elle değişiklik marker'ı da günceller.
+- Liste ad veya kodla aranabilir, 12 kayıtlık sayfalar arasında gezilebilir ve dört WGS84 sınır koordinatıyla yalnız belirli bir harita alanındaki duraklar getirilebilir.
 - Durak sayfası ve MapLibre lazy-load edilir; harita paketi uygulamanın ilk açılış paketini büyütmez.
+- Ana operasyon haritası hareket ettirildiğinde görünür bbox API'ye gönderilir. Kullanıcının rol/sahiplik kapsamındaki duraklar sayfalar halinde alınır ve kayıtlı renkleriyle GeoJSON marker olarak çizilir.
+- Katman panelindeki `Duraklar` anahtarı marker katmanını veriyi yeniden istemeden açıp kapatır.
 
 ## Kontroller
 

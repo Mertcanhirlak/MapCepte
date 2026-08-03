@@ -4,9 +4,8 @@ namespace Transport.Application.Stops;
 
 public interface IStopRepository
 {
-    Task<IReadOnlyCollection<Stop>> ListAsync(
-        Guid actorUserId,
-        StopVisibilityScope scope,
+    Task<StopRepositoryPage> ListAsync(
+        StopRepositoryQuery query,
         CancellationToken cancellationToken);
 
     Task<bool> CodeExistsAsync(
@@ -16,6 +15,10 @@ public interface IStopRepository
 
     Task<Stop?> FindByIdAsync(
         Guid stopId,
+        CancellationToken cancellationToken);
+
+    Task<IReadOnlyDictionary<Guid, Stop>> FindByIdsAsync(
+        IEnumerable<Guid> stopIds,
         CancellationToken cancellationToken);
 
     Task AddAsync(Stop stopEntity, CancellationToken cancellationToken);

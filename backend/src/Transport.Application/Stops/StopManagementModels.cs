@@ -25,6 +25,43 @@ public sealed record ArchiveStopCommand(
     Guid StopId,
     long ExpectedVersion);
 
+public sealed record StopBounds(
+    double MinLongitude,
+    double MinLatitude,
+    double MaxLongitude,
+    double MaxLatitude);
+
+public sealed record StopListQuery(
+    StopAccessContext Access,
+    string? Search,
+    int Page,
+    int PageSize,
+    StopBounds? Bounds);
+
+public sealed record StopRepositoryQuery(
+    Guid ActorUserId,
+    StopVisibilityScope Scope,
+    string? Search,
+    int Page,
+    int PageSize,
+    StopBounds? Bounds);
+
+public sealed record StopRepositoryPage(
+    IReadOnlyCollection<Transport.Domain.Stops.Stop> Items,
+    int TotalCount);
+
+public sealed record StopCatalogPage(
+    IReadOnlyCollection<StopCatalogItem> Items,
+    int Page,
+    int PageSize,
+    int TotalCount,
+    int TotalPages);
+
+public sealed record StopListResult(
+    StopManagementStatus Status,
+    StopCatalogPage? Page = null,
+    string? Error = null);
+
 public enum StopManagementStatus
 {
     Success = 0,

@@ -35,6 +35,11 @@ Accept: application/json
 
 ###
 
+GET {{Transport.Api_HostAddress}}/api/stops?search=merkez&page=1&pageSize=20&minLongitude=32.5&minLatitude=39.7&maxLongitude=33.1&maxLatitude=40.1
+Accept: application/json
+
+###
+
 POST {{Transport.Api_HostAddress}}/api/stops
 Content-Type: application/json
 X-CSRF-TOKEN: {{CsrfToken}}

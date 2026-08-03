@@ -120,7 +120,9 @@ Yeni bir endpoint'e koruma eklemek için endpoint tanımında `RequirePermission
 
 ## Durak API'si
 
-- `GET /api/stops`, `stops.read` permission'ı ister.
+- `GET /api/stops`, `stops.read` permission'ı ister ve `{ items, page, pageSize, totalCount, totalPages }` biçiminde sayfalı sonuç döndürür.
+- Liste isteği `search`, `page` ve `pageSize` parametrelerini kabul eder. `pageSize` en fazla 100 olabilir; arama ad ve kod üzerinde büyük/küçük harf duyarsız çalışır.
+- Görünür harita alanı `minLongitude`, `minLatitude`, `maxLongitude`, `maxLatitude` parametrelerinin dördü birlikte gönderilerek filtrelenir. Sorgu PostGIS konum geometrisini kullanır.
 - Admin tüm durakları, Operator kendi oluşturduğu durakları, standart User yalnız yayımlanmış durakları görür.
 - `POST /api/stops`, `stops.create` permission'ı ve CSRF token ister.
 - `PUT /api/stops/{id}`, `stops.update`; `POST /api/stops/{id}/archive`, `stops.delete` permission'ı ister.
@@ -129,6 +131,15 @@ Yeni bir endpoint'e koruma eklemek için endpoint tanımında `RequirePermission
 - Yazma istekleri istemcinin gördüğü `version` değerini taşır. Kayıt arada değişmişse API `409 Conflict` döndürür.
 - Ad, benzersiz kod, `#RRGGBB` renk ve WGS84 enlem/boylam değerleri doğrulanır.
 - Konum PostgreSQL'de `geography(Point,4326)` olarak saklanır ve GIST spatial indeks kullanır.
+
+## Güzergâh veri modeli
+
+- `transit_lines`; ad, benzersiz normalize kod, açıklama, renk, `Draft/Published/Archived` durumu, sahip kullanıcı ve artan `version` değerini saklar.
+- `transit_line_stops`, durak ile güzergâh arasındaki çoktan çoğa bağlantıyı ve 1'den başlayan `sequence` değerini saklar.
+- `(transit_line_id, stop_id)` benzersizdir; aynı durak aynı güzergâha iki kez eklenemez ancak farklı güzergâhlarda kullanılabilir.
+- `(transit_line_id, sequence)` benzersizdir ve bir güzergâhta aynı sıra numarasının tekrarını engeller.
+- Durak foreign key'i `Restrict` kullanır; referanslı durak fiziksel silmeyle kaybedilemez. Güzergâh bağlantıları yalnız üst güzergâh fiziksel olarak kaldırılırsa cascade edilir; ürün akışında arşivleme kullanılacaktır.
+- `AddTransitLines` migration'ı yerel PostgreSQL veritabanına uygulanmıştır. CRUD endpoint'leri sonraki dikey dilimde eklenecektir.
 
 ## Build ve test
 

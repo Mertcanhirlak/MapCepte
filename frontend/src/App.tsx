@@ -18,11 +18,19 @@ import {
 } from './features/auth/ProtectedRoute'
 import { LayerPanel } from './features/map/LayerPanel'
 import {
+  loadStopsInBounds,
+  type MapBounds,
+} from './features/map/stopMapData'
+import {
   DEFAULT_LAYER_VISIBILITY,
   type LayerVisibility,
   type OperationalLayerId,
 } from './features/map/mapLayers'
 import { API_BASE_URL, useApiStatus } from './shared/useApiStatus'
+import type { StopCatalogItem } from './features/stops/stopModels'
+import type { RoutePathCatalogItem } from './features/route-paths/routePathModels'
+import type { TransitLinePageResponse } from './features/transit-lines/transitLineModels'
+import { apiRequest } from './features/auth/authApi'
 
 const TransportMap = lazy(async () => {
   const module = await import('./features/map/TransportMap')
@@ -34,6 +42,12 @@ const StopManagementPage = lazy(async () => {
   const module = await import('./features/stops/StopManagementPage')
 
   return { default: module.StopManagementPage }
+})
+
+const TransitLineManagementPage = lazy(async () => {
+  const module = await import('./features/transit-lines/TransitLineManagementPage')
+
+  return { default: module.TransitLineManagementPage }
 })
 
 const apiStatusCopy = {
@@ -82,6 +96,9 @@ function AuthenticatedLayout() {
         {hasPermission('stops.read') && (
           <NavLink to="/stops">Duraklar</NavLink>
         )}
+        {hasPermission('transit_lines.read') && (
+          <NavLink to="/transit-lines">Güzergâhlar</NavLink>
+        )}
         {hasPermission('roles.read') && (
           <NavLink to="/admin/roles">Rol yönetimi</NavLink>
         )}
@@ -99,9 +116,18 @@ function AuthenticatedLayout() {
 }
 
 function MapPage() {
+  const { user } = useAuth()
   const [visibility, setVisibility] = useState<LayerVisibility>(
     DEFAULT_LAYER_VISIBILITY,
   )
+  const [bounds, setBounds] = useState<MapBounds | null>(null)
+  const [stops, setStops] = useState<StopCatalogItem[]>([])
+  const [routes, setRoutes] = useState<RoutePathCatalogItem[]>([])
+  const [areStopsLoading, setAreStopsLoading] = useState(false)
+  const [stopLoadError, setStopLoadError] = useState<string | null>(null)
+  const canReadStops = Boolean(user?.permissions.includes('stops.read'))
+  const canReadTransitLines = Boolean(user?.permissions.includes('transit_lines.read'))
+  const canReadRoutes = Boolean(user?.permissions.includes('route_paths.read'))
 
   useEffect(() => {
     document.title = 'Operasyon Haritası · MapCepte'
@@ -113,6 +139,76 @@ function MapPage() {
       [layerId]: !current[layerId],
     }))
   }, [])
+
+  const updateBounds = useCallback((nextBounds: MapBounds) => {
+    setBounds(nextBounds)
+  }, [])
+
+  useEffect(() => {
+    if (!canReadTransitLines || !canReadRoutes) {
+      setRoutes([])
+      return
+    }
+
+    let isCurrent = true
+    apiRequest<TransitLinePageResponse>('/api/transit-lines?pageSize=50')
+      .then(async (linesData) => {
+        if (!isCurrent || linesData.items.length === 0) return
+
+        const routePromises = linesData.items.map((line) =>
+          apiRequest<RoutePathCatalogItem[]>(`/api/transit-lines/${line.id}/route-paths`).catch(() => []),
+        )
+
+        const results = await Promise.all(routePromises)
+        if (isCurrent) {
+          setRoutes(results.flat())
+        }
+      })
+      .catch(() => {
+        if (isCurrent) setRoutes([])
+      })
+
+    return () => {
+      isCurrent = false
+    }
+  }, [canReadTransitLines, canReadRoutes])
+
+  useEffect(() => {
+    if (!bounds || !canReadStops) {
+      setStops([])
+      return
+    }
+
+    const controller = new AbortController()
+    let isCurrentRequest = true
+    setAreStopsLoading(true)
+    setStopLoadError(null)
+
+    loadStopsInBounds(bounds, controller.signal)
+      .then((loadedStops) => {
+        if (isCurrentRequest) {
+          setStops(loadedStops)
+        }
+      })
+      .catch((error: unknown) => {
+        if (
+          isCurrentRequest &&
+          !(error instanceof DOMException && error.name === 'AbortError')
+        ) {
+          setStopLoadError('Görünür duraklar yüklenemedi.')
+        }
+      })
+      .finally(() => {
+        if (isCurrentRequest) {
+          setAreStopsLoading(false)
+        }
+      })
+
+    return () => {
+      isCurrentRequest = false
+      controller.abort()
+    }
+  }, [bounds, canReadStops])
 
   return (
     <main className="workspace">
@@ -159,8 +255,15 @@ function MapPage() {
           <div className="map-legend" aria-label="Harita katman özeti">
             <span><i className="legend-route" aria-hidden="true" />Rota</span>
             <span><i className="legend-stop" aria-hidden="true" />Durak</span>
+            {canReadStops && (
+              <span>{areStopsLoading ? 'Duraklar yükleniyor…' : `${stops.length} görünür`}</span>
+            )}
           </div>
         </div>
+
+        {stopLoadError && (
+          <p className="map-data-error" role="alert">{stopLoadError}</p>
+        )}
 
         <Suspense
           fallback={
@@ -169,7 +272,12 @@ function MapPage() {
             </div>
           }
         >
-          <TransportMap visibility={visibility} />
+          <TransportMap
+            onBoundsChange={updateBounds}
+            stops={stops}
+            routes={routes}
+            visibility={visibility}
+          />
         </Suspense>
       </section>
     </main>
@@ -195,6 +303,22 @@ function App() {
                   }
                 >
                   <StopManagementPage />
+                </Suspense>
+              </PermissionRoute>
+            }
+          />
+          <Route
+            path="/transit-lines"
+            element={
+              <PermissionRoute permission="transit_lines.read" redirectTo="/">
+                <Suspense
+                  fallback={
+                    <main className="admin-page" role="status">
+                      Güzergâh yönetimi yükleniyor…
+                    </main>
+                  }
+                >
+                  <TransitLineManagementPage />
                 </Suspense>
               </PermissionRoute>
             }

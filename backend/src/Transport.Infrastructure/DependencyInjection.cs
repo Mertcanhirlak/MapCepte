@@ -3,12 +3,22 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Transport.Application.Calendars;
 using Transport.Application.Identity;
+using Transport.Application.RoutePaths;
+using Transport.Application.Routing;
 using Transport.Application.Stops;
+using Transport.Application.TransitLines;
+using Transport.Application.Trips;
 using Transport.Domain.Identity;
+using Transport.Infrastructure.Calendars;
 using Transport.Infrastructure.Identity;
 using Transport.Infrastructure.Persistence;
+using Transport.Infrastructure.RoutePaths;
+using Transport.Infrastructure.Routing;
 using Transport.Infrastructure.Stops;
+using Transport.Infrastructure.TransitLines;
+using Transport.Infrastructure.Trips;
 
 namespace Transport.Infrastructure;
 
@@ -40,6 +50,16 @@ public static class DependencyInjection
         services.AddScoped<IStopRepository, EfStopRepository>();
         services.AddSingleton<IStopAccessPolicy, StopAccessPolicy>();
         services.AddScoped<StopManagementService>();
+        services.AddScoped<ITransitLineRepository, EfTransitLineRepository>();
+        services.AddSingleton<ITransitLineAccessPolicy, TransitLineAccessPolicy>();
+        services.AddScoped<TransitLineManagementService>();
+        services.AddSingleton<IRoutingEngine, MockRoutingEngine>();
+        services.AddScoped<IRoutePathRepository, EfRoutePathRepository>();
+        services.AddScoped<RoutePathManagementService>();
+        services.AddScoped<IOperatingCalendarRepository, EfOperatingCalendarRepository>();
+        services.AddScoped<OperatingCalendarManagementService>();
+        services.AddScoped<ITripRepository, EfTripRepository>();
+        services.AddScoped<TripManagementService>();
         var maximumFailedAttempts = configuration.GetValue<int?>(
                 "IdentitySecurity:MaximumFailedLoginAttempts")
             ?? 5;
