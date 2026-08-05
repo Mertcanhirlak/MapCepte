@@ -18,6 +18,10 @@ import {
   type MapBounds,
 } from './stopMapData'
 import { createRouteFeatureCollection } from './routeMapData'
+import {
+  createVehicleFeatureCollection,
+  type VehiclePositionCatalogItem,
+} from './vehicleMapData'
 import type { RoutePathCatalogItem } from '../route-paths/routePathModels'
 import type { StopCatalogItem } from '../stops/stopModels'
 
@@ -25,6 +29,7 @@ interface TransportMapProps {
   visibility: LayerVisibility
   stops: StopCatalogItem[]
   routes?: RoutePathCatalogItem[]
+  vehicles?: VehiclePositionCatalogItem[]
   onBoundsChange: (bounds: MapBounds) => void
   onMapClick?: (coordinates: { longitude: number; latitude: number }) => void
 }
@@ -43,6 +48,7 @@ function addOperationalLayers(
   visibility: LayerVisibility,
   stops: StopCatalogItem[],
   routes: RoutePathCatalogItem[] = [],
+  vehicles: VehiclePositionCatalogItem[] = [],
 ) {
   for (const layerId of OPERATIONAL_LAYER_IDS) {
     map.addSource(MAP_SOURCE_IDS[layerId], {
@@ -52,7 +58,9 @@ function addOperationalLayers(
           ? createStopFeatureCollection(stops)
           : layerId === 'routes'
             ? createRouteFeatureCollection(routes)
-            : emptyFeatureCollection(),
+            : layerId === 'vehicles'
+              ? createVehicleFeatureCollection(vehicles)
+              : emptyFeatureCollection(),
     })
   }
 
@@ -132,6 +140,7 @@ export function TransportMap({
   visibility,
   stops,
   routes = [],
+  vehicles = [],
   onBoundsChange,
   onMapClick,
 }: TransportMapProps) {
@@ -243,6 +252,18 @@ export function TransportMap({
     ) as GeoJSONSource | undefined
     source?.setData(createRouteFeatureCollection(routes || []))
   }, [isReady, routes])
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !isReady) {
+      return
+    }
+
+    const source = map.getSource(
+      MAP_SOURCE_IDS.vehicles,
+    ) as GeoJSONSource | undefined
+    source?.setData(createVehicleFeatureCollection(vehicles || []))
+  }, [isReady, vehicles])
 
   return (
     <div className="map-frame">

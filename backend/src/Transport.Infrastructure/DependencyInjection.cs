@@ -10,6 +10,7 @@ using Transport.Application.Routing;
 using Transport.Application.Stops;
 using Transport.Application.TransitLines;
 using Transport.Application.Trips;
+using Transport.Application.Vehicles;
 using Transport.Domain.Identity;
 using Transport.Infrastructure.Calendars;
 using Transport.Infrastructure.Identity;
@@ -19,6 +20,7 @@ using Transport.Infrastructure.Routing;
 using Transport.Infrastructure.Stops;
 using Transport.Infrastructure.TransitLines;
 using Transport.Infrastructure.Trips;
+using Transport.Infrastructure.Vehicles;
 
 namespace Transport.Infrastructure;
 
@@ -60,6 +62,8 @@ public static class DependencyInjection
         services.AddScoped<OperatingCalendarManagementService>();
         services.AddScoped<ITripRepository, EfTripRepository>();
         services.AddScoped<TripManagementService>();
+        services.AddScoped<IVehiclePositionRepository, EfVehiclePositionRepository>();
+        services.AddScoped<VehicleTrackingService>();
         var maximumFailedAttempts = configuration.GetValue<int?>(
                 "IdentitySecurity:MaximumFailedLoginAttempts")
             ?? 5;

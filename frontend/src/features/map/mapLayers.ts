@@ -64,7 +64,7 @@ export const MAP_LAYER_CATALOG = [
   {
     id: 'vehicles',
     label: 'Canlı araçlar',
-    description: 'Gelecekte gerçek zamanlı araç konumları',
+    description: 'Gerçek zamanlı otobüs ve araç konumları',
     color: '#ef6f6c',
     order: 400,
     toggleable: true,
@@ -77,7 +77,7 @@ export const DEFAULT_LAYER_VISIBILITY: LayerVisibility = {
   routes: true,
   stops: true,
   selection: true,
-  vehicles: false,
+  vehicles: true,
 }
 
 export const MAP_SOURCE_IDS: Record<OperationalLayerId, string> = {

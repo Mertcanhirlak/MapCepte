@@ -5,6 +5,7 @@ using Transport.Domain.RoutePaths;
 using Transport.Domain.Stops;
 using Transport.Domain.TransitLines;
 using Transport.Domain.Trips;
+using Transport.Domain.Vehicles;
 using Transport.Infrastructure.Persistence.Seeding;
 
 namespace Transport.Infrastructure.Persistence;
@@ -39,6 +40,8 @@ public sealed class TransportDbContext(DbContextOptions<TransportDbContext> opti
     public DbSet<Trip> Trips => Set<Trip>();
 
     public DbSet<TripStopTime> TripStopTimes => Set<TripStopTime>();
+
+    public DbSet<VehiclePosition> VehiclePositions => Set<VehiclePosition>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

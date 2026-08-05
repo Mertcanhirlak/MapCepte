@@ -25,6 +25,6 @@ describe('map layer catalog', () => {
     expect(Object.keys(DEFAULT_LAYER_VISIBILITY).sort()).toEqual(
       [...OPERATIONAL_LAYER_IDS].sort(),
     )
-    expect(DEFAULT_LAYER_VISIBILITY.vehicles).toBe(false)
+    expect(DEFAULT_LAYER_VISIBILITY.vehicles).toBe(true)
   })
 })

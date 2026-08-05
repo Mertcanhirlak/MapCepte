@@ -30,7 +30,7 @@ public sealed class SystemEndpointsTests
         Assert.NotNull(response);
         Assert.Equal("MapCepte Transport API", response.Name);
         Assert.Equal(".NET 10", response.Runtime);
-        Assert.Equal("TripAndTimetableManagement", response.Phase);
+        Assert.Equal("LiveVehicleTracking", response.Phase);
     }
 
     private sealed record SystemInfo(string Name, string Runtime, string Phase);

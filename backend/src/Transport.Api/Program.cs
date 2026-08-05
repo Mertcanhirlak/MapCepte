@@ -6,11 +6,13 @@ using Transport.Api.Authorization;
 using Transport.Api.Calendars;
 using Transport.Api.Contracts;
 using Transport.Api.Health;
+using Transport.Api.Hubs;
 using Transport.Api.Identity;
 using Transport.Api.RoutePaths;
 using Transport.Api.Stops;
 using Transport.Api.TransitLines;
 using Transport.Api.Trips;
+using Transport.Api.Vehicles;
 using Transport.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -95,6 +97,8 @@ builder.Services.AddCors(options =>
             .AllowAnyMethod());
 });
 
+builder.Services.AddSignalR();
+
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
@@ -120,6 +124,8 @@ app.MapTransitLineEndpoints();
 app.MapRoutePathEndpoints();
 app.MapOperatingCalendarEndpoints();
 app.MapTripEndpoints();
+app.MapVehicleEndpoints();
+app.MapHub<VehicleTrackingHub>("/hubs/vehicle-tracking");
 
 app.MapGet(
         "/api/system",
@@ -127,7 +133,7 @@ app.MapGet(
             new SystemInfoResponse(
                 Name: "MapCepte Transport API",
                 Runtime: ".NET 10",
-                Phase: "TripAndTimetableManagement")))
+                Phase: "LiveVehicleTracking")))
     .WithName("GetSystemInfo")
     .WithTags("System");
 
