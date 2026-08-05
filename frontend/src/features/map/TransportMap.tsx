@@ -235,6 +235,16 @@ export function TransportMap({
       return
     }
 
+    // Toggle base map raster layer ('base-map')
+    if (map.getLayer('base-map')) {
+      map.setLayoutProperty(
+        'base-map',
+        'visibility',
+        mapVisibility(visibility.base !== false),
+      )
+    }
+
+    // Toggle operational layers
     for (const layerId of OPERATIONAL_LAYER_IDS) {
       const renderLayerId = MAP_RENDER_LAYER_IDS[layerId]
 
@@ -245,6 +255,15 @@ export function TransportMap({
           mapVisibility(visibility[layerId]),
         )
       }
+    }
+
+    // Toggle stop text labels layer linked to stops visibility
+    if (map.getLayer('stops-labels-layer')) {
+      map.setLayoutProperty(
+        'stops-labels-layer',
+        'visibility',
+        mapVisibility(visibility.stops),
+      )
     }
   }, [isReady, visibility])
 

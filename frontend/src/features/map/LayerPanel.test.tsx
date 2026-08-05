@@ -19,14 +19,17 @@ describe('LayerPanel', () => {
     expect(onToggle).toHaveBeenCalledWith('routes')
   })
 
-  it('keeps the base map enabled', () => {
+  it('allows toggling the base map layer', () => {
+    const onToggle = vi.fn()
     render(
       <LayerPanel
         visibility={DEFAULT_LAYER_VISIBILITY}
-        onToggle={vi.fn()}
+        onToggle={onToggle}
       />,
     )
 
-    expect(screen.getByLabelText('Temel harita katmanını göster')).toBeDisabled()
+    fireEvent.click(screen.getByLabelText('Temel harita katmanını göster'))
+
+    expect(onToggle).toHaveBeenCalledWith('base')
   })
 })

@@ -7,7 +7,7 @@ export const OPERATIONAL_LAYER_IDS = [
 
 export type OperationalLayerId = (typeof OPERATIONAL_LAYER_IDS)[number]
 
-export type LayerVisibility = Record<OperationalLayerId, boolean>
+export type LayerVisibility = Record<'base' | OperationalLayerId, boolean>
 
 export interface MapLayerDescriptor {
   id: 'base' | OperationalLayerId
@@ -24,17 +24,17 @@ export const MAP_LAYER_CATALOG = [
   {
     id: 'base',
     label: 'Temel harita',
-    description: 'Yollar ve coğrafi referans',
+    description: 'Yollar ve coğrafi referans (OpenStreetMap)',
     color: '#8a9aa4',
     order: 0,
-    toggleable: false,
+    toggleable: true,
     visibleInPanel: true,
     phase: 'Hazır',
   },
   {
     id: 'routes',
     label: 'Rotalar',
-    description: 'PostGIS üzerinden gelecek gerçek yol çizgileri',
+    description: 'PostGIS üzerinden gelen gerçek yol çizgileri',
     color: '#13b8a6',
     order: 100,
     toggleable: true,
@@ -44,7 +44,7 @@ export const MAP_LAYER_CATALOG = [
   {
     id: 'stops',
     label: 'Duraklar',
-    description: 'Rotaların üzerinde gösterilen durak noktaları',
+    description: 'Harita üzerinde gösterilen durak noktaları',
     color: '#f6b84a',
     order: 200,
     toggleable: true,
@@ -74,6 +74,7 @@ export const MAP_LAYER_CATALOG = [
 ] as const satisfies readonly MapLayerDescriptor[]
 
 export const DEFAULT_LAYER_VISIBILITY: LayerVisibility = {
+  base: true,
   routes: true,
   stops: true,
   selection: true,

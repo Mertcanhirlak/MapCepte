@@ -181,7 +181,7 @@ function MapPage() {
     document.title = 'Operasyon Haritası · MapCepte'
   }, [])
 
-  const toggleLayer = useCallback((layerId: OperationalLayerId) => {
+  const toggleLayer = useCallback((layerId: 'base' | OperationalLayerId) => {
     setVisibility((current) => ({
       ...current,
       [layerId]: !current[layerId],
