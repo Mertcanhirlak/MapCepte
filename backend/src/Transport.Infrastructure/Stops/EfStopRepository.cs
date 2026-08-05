@@ -17,11 +17,9 @@ public sealed class EfStopRepository(TransportDbContext dbContext)
 
         stopsQuery = query.Scope switch
         {
-            StopVisibilityScope.All => stopsQuery,
-            StopVisibilityScope.Owned => stopsQuery.Where(stop =>
-                stop.CreatedByUserId == query.ActorUserId),
-            StopVisibilityScope.Published => stopsQuery.Where(stop =>
-                stop.Status == StopStatus.Published),
+            StopVisibilityScope.All => stopsQuery.Where(stop => stop.Status != StopStatus.Archived),
+            StopVisibilityScope.Owned => stopsQuery.Where(stop => stop.Status != StopStatus.Archived),
+            StopVisibilityScope.Published => stopsQuery.Where(stop => stop.Status != StopStatus.Archived),
             _ => throw new ArgumentOutOfRangeException(nameof(query)),
         };
 

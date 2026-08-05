@@ -88,10 +88,29 @@ function addOperationalLayers(
       visibility: mapVisibility(visibility.stops),
     },
     paint: {
-      'circle-radius': 7,
+      'circle-radius': 9,
       'circle-color': ['coalesce', ['get', 'color'], '#f6b84a'],
-      'circle-stroke-color': '#152630',
-      'circle-stroke-width': 2,
+      'circle-stroke-color': '#ffffff',
+      'circle-stroke-width': 2.5,
+    },
+  })
+
+  map.addLayer({
+    id: 'stops-labels-layer',
+    type: 'symbol',
+    source: MAP_SOURCE_IDS.stops,
+    layout: {
+      visibility: mapVisibility(visibility.stops),
+      'text-field': ['get', 'name'],
+      'text-size': 12,
+      'text-offset': [0, 1.3],
+      'text-anchor': 'top',
+      'text-optional': true,
+    },
+    paint: {
+      'text-color': '#0f172a',
+      'text-halo-color': '#ffffff',
+      'text-halo-width': 2,
     },
   })
 

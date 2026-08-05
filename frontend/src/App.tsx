@@ -120,7 +120,12 @@ function MapPage() {
   const [visibility, setVisibility] = useState<LayerVisibility>(
     DEFAULT_LAYER_VISIBILITY,
   )
-  const [bounds, setBounds] = useState<MapBounds | null>(null)
+  const [bounds, setBounds] = useState<MapBounds | null>({
+    minLongitude: 32.4,
+    minLatitude: 39.7,
+    maxLongitude: 33.3,
+    maxLatitude: 40.2,
+  })
   const [stops, setStops] = useState<StopCatalogItem[]>([])
   const [routes, setRoutes] = useState<RoutePathCatalogItem[]>([])
   const [areStopsLoading, setAreStopsLoading] = useState(false)
