@@ -1,6 +1,7 @@
 import type { StyleSpecification } from 'maplibre-gl'
 
-export const TURKEY_MAP_CENTER: [number, number] = [35.2, 39]
+export const ANKARA_MAP_CENTER: [number, number] = [32.8597, 39.9208]
+export const TURKEY_MAP_CENTER: [number, number] = ANKARA_MAP_CENTER
 
 export const DEVELOPMENT_MAP_STYLE: StyleSpecification = {
   version: 8,

@@ -103,9 +103,9 @@ export function StopLocationPicker({
       style: configuredMapStyle(),
       center: initialCoordinates
         ? [initialCoordinates.longitude, initialCoordinates.latitude]
-        : TURKEY_MAP_CENTER,
-      zoom: initialCoordinates ? 15 : 5.15,
-      minZoom: 3,
+        : TURKEY_MAP_CENTER, // Ankara center [32.8597, 39.9208]
+      zoom: initialCoordinates ? 15 : 12,
+      minZoom: 5,
       attributionControl: false,
     })
 
@@ -211,10 +211,31 @@ export function StopLocationPicker({
           </span>
         )}
       </div>
-      <p className="picker-help">
-        Klavye kullanıyorsanız boylam ve enlem alanlarına değerleri doğrudan
-        yazabilirsiniz; marker otomatik güncellenir.
-      </p>
+      <div className="picker-help" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center', marginTop: '0.5rem' }}>
+        <span style={{ fontWeight: 600, fontSize: '0.8rem' }}>Ankara Hazır Konumlar:</span>
+        {[
+          { name: 'Kızılay', lng: 32.8543, lat: 39.9208 },
+          { name: 'Ulus', lng: 32.8547, lat: 39.9431 },
+          { name: 'AŞTİ', lng: 32.8128, lat: 39.9186 },
+          { name: 'Tunalı', lng: 32.8601, lat: 39.9056 },
+          { name: 'Batıkent', lng: 32.7486, lat: 39.9678 },
+        ].map((preset) => (
+          <button
+            key={preset.name}
+            type="button"
+            className="secondary-button"
+            style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem' }}
+            disabled={disabled}
+            onClick={() => {
+              const coords = { longitude: preset.lng, latitude: preset.lat }
+              onChangeRef.current(coords)
+              mapRef.current?.easeTo({ center: [preset.lng, preset.lat], zoom: 14 })
+            }}
+          >
+            📍 {preset.name}
+          </button>
+        ))}
+      </div>
     </section>
   )
 }

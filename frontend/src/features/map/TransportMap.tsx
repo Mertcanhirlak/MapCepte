@@ -12,7 +12,7 @@ import {
   OPERATIONAL_LAYER_IDS,
   type LayerVisibility,
 } from './mapLayers'
-import { configuredMapStyle, TURKEY_MAP_CENTER } from './mapStyle'
+import { configuredMapStyle } from './mapStyle'
 import {
   createStopFeatureCollection,
   type MapBounds,
@@ -26,6 +26,7 @@ interface TransportMapProps {
   stops: StopCatalogItem[]
   routes?: RoutePathCatalogItem[]
   onBoundsChange: (bounds: MapBounds) => void
+  onMapClick?: (coordinates: { longitude: number; latitude: number }) => void
 }
 
 const emptyFeatureCollection = () => ({
@@ -130,8 +131,9 @@ function currentMapBounds(map: MapLibreMap): MapBounds {
 export function TransportMap({
   visibility,
   stops,
-  routes,
+  routes = [],
   onBoundsChange,
+  onMapClick,
 }: TransportMapProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<MapLibreMap | null>(null)
@@ -139,10 +141,12 @@ export function TransportMap({
   const initialStopsRef = useRef(stops)
   const initialRoutesRef = useRef(routes)
   const onBoundsChangeRef = useRef(onBoundsChange)
+  const onMapClickRef = useRef(onMapClick)
   const [isReady, setIsReady] = useState(false)
   const [hasError, setHasError] = useState(false)
 
   onBoundsChangeRef.current = onBoundsChange
+  onMapClickRef.current = onMapClick
 
   useEffect(() => {
     if (!containerRef.current) {
@@ -152,9 +156,9 @@ export function TransportMap({
     const map = new MapLibreMap({
       container: containerRef.current,
       style: configuredMapStyle(),
-      center: TURKEY_MAP_CENTER,
-      zoom: 5.15,
-      minZoom: 3,
+      center: [32.8597, 39.9208],
+      zoom: 12,
+      minZoom: 5,
       attributionControl: false,
     })
 
@@ -175,6 +179,15 @@ export function TransportMap({
 
     map.on('moveend', () => {
       onBoundsChangeRef.current(currentMapBounds(map))
+    })
+
+    map.on('click', (e) => {
+      if (onMapClickRef.current) {
+        onMapClickRef.current({
+          longitude: Number(e.lngLat.lng.toFixed(6)),
+          latitude: Number(e.lngLat.lat.toFixed(6)),
+        })
+      }
     })
 
     map.on('error', () => {

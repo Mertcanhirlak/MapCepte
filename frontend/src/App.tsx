@@ -30,7 +30,7 @@ import { API_BASE_URL, useApiStatus } from './shared/useApiStatus'
 import type { StopCatalogItem } from './features/stops/stopModels'
 import type { RoutePathCatalogItem } from './features/route-paths/routePathModels'
 import type { TransitLinePageResponse } from './features/transit-lines/transitLineModels'
-import { apiRequest } from './features/auth/authApi'
+import { apiRequest, csrfRequest } from './features/auth/authApi'
 
 const TransportMap = lazy(async () => {
   const module = await import('./features/map/TransportMap')
@@ -126,8 +126,51 @@ function MapPage() {
   const [areStopsLoading, setAreStopsLoading] = useState(false)
   const [stopLoadError, setStopLoadError] = useState<string | null>(null)
   const canReadStops = Boolean(user?.permissions.includes('stops.read'))
+  const canCreateStops = Boolean(user?.permissions.includes('stops.create'))
   const canReadTransitLines = Boolean(user?.permissions.includes('transit_lines.read'))
   const canReadRoutes = Boolean(user?.permissions.includes('route_paths.read'))
+
+  const [selectedCoords, setSelectedCoords] = useState<{ longitude: number; latitude: number } | null>(null)
+  const [newStopName, setNewStopName] = useState('')
+  const [newStopCode, setNewStopCode] = useState('')
+  const [isCreatingStop, setIsCreatingStop] = useState(false)
+  const [createMessage, setCreateMessage] = useState<string | null>(null)
+
+  const handleMapClick = useCallback((coords: { longitude: number; latitude: number }) => {
+    if (canCreateStops) {
+      setSelectedCoords(coords)
+      setNewStopName(`Durak (${coords.longitude.toFixed(4)}, ${coords.latitude.toFixed(4)})`)
+      setNewStopCode('')
+      setCreateMessage(null)
+    }
+  }, [canCreateStops])
+
+  async function handleQuickCreateStop(e: React.FormEvent) {
+    e.preventDefault()
+    if (!selectedCoords || !newStopName.trim()) return
+
+    setIsCreatingStop(true)
+    try {
+      const created = await csrfRequest<StopCatalogItem>('/api/stops', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: newStopName.trim(),
+          code: newStopCode.trim() || null,
+          color: '#13B8A6',
+          longitude: selectedCoords.longitude,
+          latitude: selectedCoords.latitude,
+        }),
+      })
+
+      setStops((prev) => [...prev, created])
+      setCreateMessage(`"${created.name}" durağı haritada oluşturuldu!`)
+      setSelectedCoords(null)
+    } catch {
+      setCreateMessage('Durak eklenirken bir hata oluştu.')
+    } finally {
+      setIsCreatingStop(false)
+    }
+  }
 
   useEffect(() => {
     document.title = 'Operasyon Haritası · MapCepte'
@@ -249,8 +292,8 @@ function MapPage() {
       <section className="map-section" aria-labelledby="map-heading">
         <div className="map-toolbar">
           <div>
-            <p className="eyebrow">Operasyon görünümü</p>
-            <h2 id="map-heading">Türkiye ulaşım haritası</h2>
+            <p className="eyebrow">Ankara Operasyon Görünümü</p>
+            <h2 id="map-heading">Ankara Ulaşım Haritası</h2>
           </div>
           <div className="map-legend" aria-label="Harita katman özeti">
             <span><i className="legend-route" aria-hidden="true" />Rota</span>
@@ -260,6 +303,60 @@ function MapPage() {
             )}
           </div>
         </div>
+
+        {createMessage && (
+          <p className="connection-card" style={{ background: '#0d9488', color: '#fff', marginBottom: '0.5rem', padding: '0.5rem 1rem' }}>
+            {createMessage}
+          </p>
+        )}
+
+        {selectedCoords && canCreateStops && (
+          <form className="stop-create-card" onSubmit={handleQuickCreateStop} style={{ marginBottom: '0.75rem', border: '2px solid #13B8A6' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <strong>📍 Haritada Seçilen Noktaya Durak Ekle</strong>
+              <span style={{ fontSize: '0.8rem', color: '#13B8A6' }}>
+                Koordinat: {selectedCoords.longitude.toFixed(6)}, {selectedCoords.latitude.toFixed(6)}
+              </span>
+            </div>
+            <div className="stop-form-grid" style={{ marginTop: '0.5rem' }}>
+              <label>
+                <span>Durak Adı</span>
+                <input
+                  type="text"
+                  value={newStopName}
+                  onChange={(e) => setNewStopName(e.target.value)}
+                  required
+                  placeholder="örn. Kızılay Meydanı Durağı"
+                />
+              </label>
+              <label>
+                <span>Durak Kodu (Opsiyonel)</span>
+                <input
+                  type="text"
+                  value={newStopCode}
+                  onChange={(e) => setNewStopCode(e.target.value)}
+                  placeholder="örn. KZL-01"
+                />
+              </label>
+            </div>
+            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem', justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => setSelectedCoords(null)}
+              >
+                İptal
+              </button>
+              <button
+                type="submit"
+                className="primary-button"
+                disabled={isCreatingStop || !newStopName.trim()}
+              >
+                {isCreatingStop ? 'Kaydediliyor...' : 'Durak Oluştur'}
+              </button>
+            </div>
+          </form>
+        )}
 
         {stopLoadError && (
           <p className="map-data-error" role="alert">{stopLoadError}</p>
@@ -274,6 +371,7 @@ function MapPage() {
         >
           <TransportMap
             onBoundsChange={updateBounds}
+            onMapClick={handleMapClick}
             stops={stops}
             routes={routes}
             visibility={visibility}
